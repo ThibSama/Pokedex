@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
+import { AppShell } from '@/components/AppShell';
 import { FavoritesProvider } from '@/favorites/FavoritesProvider';
 import { POPPINS_FONTS } from '@/theme/typography';
 
@@ -26,13 +27,17 @@ export default function RootLayout() {
 
   return (
     <FavoritesProvider>
-      <Stack>
-        <Stack.Screen name="index" options={{ title: 'Pokédex' }} />
-        {/* Both screens paint their own Figma header area, back affordance included. */}
-        <Stack.Screen name="pokedex" options={{ headerShown: false }} />
-        <Stack.Screen name="collection" options={{ title: 'Collection' }} />
-        <Stack.Screen name="pokemon/[id]" options={{ headerShown: false }} />
-      </Stack>
+      {/* One width cap for every route: on a wide browser the whole navigator
+          is centered in a phone-sized column; on native it is a no-op. */}
+      <AppShell>
+        <Stack screenOptions={{ headerShown: false }}>
+          {/* Every screen paints its own Figma header area, back affordance included. */}
+          <Stack.Screen name="index" />
+          <Stack.Screen name="pokedex" />
+          <Stack.Screen name="collection" />
+          <Stack.Screen name="pokemon/[id]" />
+        </Stack>
+      </AppShell>
     </FavoritesProvider>
   );
 }

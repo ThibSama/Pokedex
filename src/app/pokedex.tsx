@@ -9,16 +9,17 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DEFAULT_BATCH_SIZE, fetchPokemonBatch } from '@/api/pokeApi';
+import { useFrameWidth } from '@/components/AppShell';
 import { PokemonCard } from '@/components/PokemonCard';
-import { getTypeColor, PALETTE } from '@/constants/typeColors';
+import { getTypeColor, PALETTE, POKEDEX_RED } from '@/constants/typeColors';
 import { FONT_FAMILY, TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
+import { GRID_GAP, gridTileWidth } from '@/utils/grid';
 import {
   DEFAULT_LIST_OPTIONS,
   applyListOptions,
@@ -39,22 +40,15 @@ const SORT_ICONS: Record<SortMode, 'sort-numeric-variant' | 'sort-alphabetical-v
 const SORT_MODES = Object.keys(SORT_ICONS) as SortMode[];
 
 /** Figma list frame 1017:431. */
-const POKEDEX_RED = '#DC0A2D';
 const HEADER_PADDING = 16;
 const COLUMNS = 3;
 /** White sheet inset from the red shell, per Figma. */
 const SHELL_PADDING = 4;
 const LIST_PADDING = 12;
-const GRID_GAP = 8;
 
-/**
- * Tile width for exactly `COLUMNS` columns across the grid's content box.
- * Fractional on purpose: rounding down leaves unused white space on the right.
- * 360px → 104, 393px → 115.
- */
-function tileWidth(windowWidth: number): number {
-  const content = windowWidth - 2 * SHELL_PADDING - 2 * LIST_PADDING;
-  return Math.max(48, (content - (COLUMNS - 1) * GRID_GAP) / COLUMNS);
+/** Content box the grid lays out in, inside the red shell and the white sheet. */
+function gridContentWidth(frameWidth: number): number {
+  return frameWidth - 2 * SHELL_PADDING - 2 * LIST_PADDING;
 }
 
 function goBack() {
@@ -63,7 +57,7 @@ function goBack() {
 }
 
 export default function PokedexScreen() {
-  const { width } = useWindowDimensions();
+  const width = useFrameWidth();
   const insets = useSafeAreaInsets();
 
   // Canonical loaded data, in fetch order. Never sorted/filtered in place.
@@ -124,7 +118,7 @@ export default function PokedexScreen() {
   // Search/sort/filter are derived purely from client state — no network involved.
   const visible = useMemo(() => applyListOptions(items, options), [items, options]);
   const availableTypes = useMemo(() => collectTypes(items), [items]);
-  const cardWidth = useMemo(() => tileWidth(width), [width]);
+  const cardWidth = useMemo(() => gridTileWidth(gridContentWidth(width), COLUMNS), [width]);
 
   const isInitialLoading = status === 'loading' && items.length === 0;
   const isInitialError = status === 'error' && items.length === 0;
@@ -234,7 +228,7 @@ export default function PokedexScreen() {
             key={`grid-${COLUMNS}`}
             numColumns={COLUMNS}
             keyExtractor={(item) => String(item.id)}
-            renderItem={({ item }) => <PokemonCard pokemon={item} variant="grid" width={cardWidth} />}
+            renderItem={({ item }) => <PokemonCard pokemon={item} width={cardWidth} />}
             contentContainerStyle={styles.list}
             columnWrapperStyle={styles.column}
             onEndReached={loadMore}

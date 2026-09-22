@@ -166,84 +166,93 @@ export default function PokemonDetailScreen() {
         </View>
 
         <View style={styles.card}>
-          <View style={styles.types}>
-            {details.types.map((type) => (
-              <TypeBadge key={type} type={type} />
-            ))}
-          </View>
+          {/* Three groups, so a tall viewport shares its spare height between
+              them instead of dumping it all below Base Stats. On a short screen
+              they simply stack as before. */}
+          <View style={styles.group}>
+            <View style={styles.types}>
+              {details.types.map((type) => (
+                <TypeBadge key={type} type={type} />
+              ))}
+            </View>
 
-          {/* Secondary actions: compact, and purely local to already-loaded data. */}
-          <View style={styles.actions}>
-            <Segmented
-              accent={accent}
-              accessibilityLabel="Apparence"
-              options={[
-                { key: 'normal', label: 'Normal' },
-                { key: 'shiny', label: 'Shiny', disabled: !shinyAvailable },
-              ]}
-              value={variant}
-              onChange={setVariant}
-            />
-            <Segmented
-              accent={accent}
-              accessibilityLabel="Langue du nom"
-              options={[
-                { key: 'fr', label: 'FR' },
-                { key: 'en', label: 'EN' },
-              ]}
-              value={language}
-              onChange={setLanguage}
-            />
-            <CryButton apiName={details.apiName} accent={accent} />
-            <Pressable
-              onPress={() => toggleFavorite(details.id)}
-              disabled={!hydrated}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={
-                favorite ? `Retirer ${name} de la collection` : `Ajouter ${name} à la collection`
-              }
-              accessibilityState={{ disabled: !hydrated, selected: favorite }}
-              style={[
-                styles.iconButton,
-                favorite && { backgroundColor: accent },
-                !hydrated && styles.disabled,
-              ]}>
-              <MaterialCommunityIcons
-                name={favorite ? 'heart' : 'heart-outline'}
-                size={16}
-                color={favorite ? PALETTE.white : accent}
+            {/* Secondary actions: compact, and purely local to already-loaded data. */}
+            <View style={styles.actions}>
+              <Segmented
+                accent={accent}
+                accessibilityLabel="Apparence"
+                options={[
+                  { key: 'normal', label: 'Normal' },
+                  { key: 'shiny', label: 'Shiny', disabled: !shinyAvailable },
+                ]}
+                value={variant}
+                onChange={setVariant}
               />
-            </Pressable>
-          </View>
-
-          <Text style={[styles.sectionTitle, { color: accent }]}>About</Text>
-          <View style={styles.about}>
-            <AboutColumn label="Poids" icon="weight-kilogram" lines={[formatMetric(details.weightKg, 'kg')]} />
-            <View style={styles.aboutDivider} />
-            <AboutColumn label="Taille" icon="ruler" lines={[formatMetric(details.heightM, 'm')]} />
-            <View style={styles.aboutDivider} />
-            <AboutColumn
-              label="Talents"
-              lines={details.abilities.map((ability) =>
-                ability.isHidden ? `${humanizeSlug(ability.name)} (caché)` : humanizeSlug(ability.name),
-              )}
-            />
-          </View>
-
-          <Text style={styles.description}>{details.description ?? 'Aucune description disponible.'}</Text>
-
-          <Text style={[styles.sectionTitle, { color: accent }]}>Base Stats</Text>
-          <View style={styles.stats}>
-            {STAT_ROWS.map(({ key, label }, index) => (
-              <StatBar
-                key={key}
-                label={label}
-                value={details.stats[key]}
-                color={accent}
-                delayMs={index * STAT_STAGGER_MS}
+              <Segmented
+                accent={accent}
+                accessibilityLabel="Langue du nom"
+                options={[
+                  { key: 'fr', label: 'FR' },
+                  { key: 'en', label: 'EN' },
+                ]}
+                value={language}
+                onChange={setLanguage}
               />
-            ))}
+              <CryButton apiName={details.apiName} accent={accent} />
+              <Pressable
+                onPress={() => toggleFavorite(details.id)}
+                disabled={!hydrated}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  favorite ? `Retirer ${name} de la collection` : `Ajouter ${name} à la collection`
+                }
+                accessibilityState={{ disabled: !hydrated, selected: favorite }}
+                style={[
+                  styles.iconButton,
+                  favorite && { backgroundColor: accent },
+                  !hydrated && styles.disabled,
+                ]}>
+                <MaterialCommunityIcons
+                  name={favorite ? 'heart' : 'heart-outline'}
+                  size={16}
+                  color={favorite ? PALETTE.white : accent}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.group}>
+            <Text style={[styles.sectionTitle, { color: accent }]}>About</Text>
+            <View style={styles.about}>
+              <AboutColumn label="Poids" icon="weight-kilogram" lines={[formatMetric(details.weightKg, 'kg')]} />
+              <View style={styles.aboutDivider} />
+              <AboutColumn label="Taille" icon="ruler" lines={[formatMetric(details.heightM, 'm')]} />
+              <View style={styles.aboutDivider} />
+              <AboutColumn
+                label="Talents"
+                lines={details.abilities.map((ability) =>
+                  ability.isHidden ? `${humanizeSlug(ability.name)} (caché)` : humanizeSlug(ability.name),
+                )}
+              />
+            </View>
+
+            <Text style={styles.description}>{details.description ?? 'Aucune description disponible.'}</Text>
+          </View>
+
+          <View style={styles.group}>
+            <Text style={[styles.sectionTitle, { color: accent }]}>Base Stats</Text>
+            <View style={styles.stats}>
+              {STAT_ROWS.map(({ key, label }, index) => (
+                <StatBar
+                  key={key}
+                  label={label}
+                  value={details.stats[key]}
+                  color={accent}
+                  delayMs={index * STAT_STAGGER_MS}
+                />
+              ))}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -455,6 +464,13 @@ const styles = StyleSheet.create({
     paddingTop: ARTWORK_OVERLAP + 8,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    gap: 16,
+    // Spare height on a tall phone is shared between the three groups rather
+    // than left as one dead block under Base Stats. A no-op once the content
+    // is taller than the viewport, so 360x640 layouts are untouched.
+    justifyContent: 'space-between',
+  },
+  group: {
     gap: 16,
   },
   types: {

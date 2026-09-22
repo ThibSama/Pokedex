@@ -29,6 +29,9 @@ export const PALETTE = {
   dark: '#212121',
 } as const;
 
+/** Pokédex brand red from the Figma list frame; the app's shell color. */
+export const POKEDEX_RED = '#DC0A2D';
+
 export function getTypeColor(type: string | undefined): string {
   return (type && TYPE_COLORS[type]) ?? TYPE_COLORS.normal;
 }

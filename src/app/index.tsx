@@ -1,3 +1,4 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -6,8 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchPokemonById } from '@/api/pokeApi';
 import { TypeBadge } from '@/components/TypeBadge';
-import { getTypeColor, PALETTE, withAlpha } from '@/constants/typeColors';
+import { getTypeColor, PALETTE, POKEDEX_RED, withAlpha } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
+import { TYPO } from '@/theme/typography';
 import type { NationalDexId, PokemonSummary } from '@/types/pokemon';
 import { formatDexNumber } from '@/utils/pokemonList';
 
@@ -18,6 +20,9 @@ const FALLBACK_HERO_ID: NationalDexId = 197;
 type HeroResult =
   | { id: NationalDexId; status: 'success'; pokemon: PokemonSummary }
   | { id: NationalDexId; status: 'error'; message: string };
+
+/** Same barely-there Pokéball the detail screen paints behind its artwork. */
+const WATERMARK_SIZE = 208;
 
 function pickRandom(ids: readonly NationalDexId[]): NationalDexId {
   return ids[Math.floor(Math.random() * ids.length)];
@@ -98,7 +103,22 @@ export default function HomeScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.brand}>
+          <MaterialCommunityIcons name="pokeball" size={28} color={POKEDEX_RED} />
+          <View style={styles.brandText}>
+            <Text style={styles.brandTitle} accessibilityRole="header">
+              Pokédex
+            </Text>
+            <Text style={styles.brandSubtitle}>Johto & Kanto · 251 Pokémon</Text>
+          </View>
+        </View>
+
         <View style={[styles.hero, { backgroundColor: accent }]}>
+          {/* Same watermark as the detail screen, so the two heroes read alike. */}
+          <View style={styles.watermark} pointerEvents="none">
+            <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color="rgba(255, 255, 255, 0.12)" />
+          </View>
+
           <Text style={styles.heroKicker}>{isFallbackHero ? 'Pokémon vedette' : 'Votre vedette'}</Text>
 
           {!hydrated || state.status === 'loading' ? (
@@ -142,42 +162,83 @@ export default function HomeScreen() {
                   <TypeBadge key={type} type={type} />
                 ))}
               </View>
-              <Text style={styles.heroCta}>Voir la fiche →</Text>
+              <View style={styles.heroCta}>
+                <Text style={styles.heroCtaText}>Voir la fiche</Text>
+                <MaterialCommunityIcons name="chevron-right" size={16} color={accent} />
+              </View>
             </Pressable>
           )}
         </View>
 
         <View style={styles.actions}>
-          <Pressable
-            onPress={() => router.push('/pokedex')}
-            accessibilityRole="button"
+          <ActionCard
+            accent={POKEDEX_RED}
+            icon="format-list-bulleted"
+            title="Pokédex"
+            subtitle="Rechercher, trier et filtrer"
+            value="251"
+            unit="Pokémon"
             accessibilityLabel="Ouvrir le Pokédex"
             accessibilityHint="Affiche la liste des Pokémon"
-            style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
-          >
-            <Text style={styles.actionTitle}>Pokédex</Text>
-            <Text style={styles.actionSubtitle}>Parcourir et rechercher les 251 Pokémon</Text>
-            <Text style={[styles.actionBadge, { backgroundColor: withAlpha(accent, 0.15), color: accent }]}>
-              Explorer
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/collection')}
-            accessibilityRole="button"
+            onPress={() => router.push('/pokedex')}
+          />
+          <ActionCard
+            accent={accent}
+            icon="heart"
+            title="Collection"
+            subtitle="Vos Pokémon favoris"
+            value={hydrated ? String(favoriteCount) : '…'}
+            unit={favoriteCount > 1 ? 'favoris' : 'favori'}
             accessibilityLabel={`Ouvrir la collection, ${favoriteCount} Pokémon favori${favoriteCount > 1 ? 's' : ''}`}
             accessibilityHint="Affiche vos Pokémon favoris"
-            style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
-          >
-            <Text style={styles.actionTitle}>Collection</Text>
-            <Text style={styles.actionSubtitle}>Vos Pokémon favoris, toujours à portée</Text>
-            <Text style={[styles.actionBadge, { backgroundColor: withAlpha(accent, 0.15), color: accent }]}>
-              {hydrated ? `${favoriteCount} favori${favoriteCount > 1 ? 's' : ''}` : '…'}
-            </Text>
-          </Pressable>
+            onPress={() => router.push('/collection')}
+          />
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/** One dashboard tile: accent icon chip, label, and a live count in accent. */
+function ActionCard({
+  accent,
+  icon,
+  title,
+  subtitle,
+  value,
+  unit,
+  accessibilityLabel,
+  accessibilityHint,
+  onPress,
+}: {
+  accent: string;
+  icon: 'format-list-bulleted' | 'heart';
+  title: string;
+  subtitle: string;
+  value: string;
+  unit: string;
+  accessibilityLabel: string;
+  accessibilityHint: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      style={({ pressed }) => [styles.actionCard, { borderTopColor: accent }, pressed && styles.pressed]}
+    >
+      <View style={[styles.actionIcon, { backgroundColor: withAlpha(accent, 0.14) }]}>
+        <MaterialCommunityIcons name={icon} size={20} color={accent} />
+      </View>
+      <Text style={styles.actionTitle}>{title}</Text>
+      <Text style={styles.actionSubtitle}>{subtitle}</Text>
+      <View style={styles.actionMetric}>
+        <Text style={[styles.actionValue, { color: accent }]}>{value}</Text>
+        <Text style={styles.actionUnit}>{unit}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -191,17 +252,38 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingBottom: 32,
   },
+  brand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  brandText: {
+    gap: 2,
+  },
+  brandTitle: {
+    ...TYPO.headline,
+    color: PALETTE.dark,
+  },
+  brandSubtitle: {
+    ...TYPO.body2,
+    color: PALETTE.medium,
+  },
   hero: {
     borderRadius: 24,
     padding: 20,
     gap: 12,
     minHeight: 380,
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  watermark: {
+    position: 'absolute',
+    top: -32,
+    right: -32,
   },
   heroKicker: {
+    ...TYPO.subtitle3,
     color: withAlpha(PALETTE.white, 0.85),
-    fontSize: 12,
-    fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
     textAlign: 'center',
@@ -213,14 +295,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroPlaceholderText: {
+    ...TYPO.subtitle1,
     color: PALETTE.white,
-    fontSize: 15,
-    fontWeight: '600',
     textAlign: 'center',
   },
   heroErrorDetail: {
+    ...TYPO.body2,
     color: withAlpha(PALETTE.white, 0.8),
-    fontSize: 13,
     textAlign: 'center',
   },
   retryButton: {
@@ -230,8 +311,8 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.white,
   },
   retryText: {
+    ...TYPO.subtitle1,
     color: PALETTE.dark,
-    fontWeight: '700',
   },
   heroBody: {
     alignItems: 'center',
@@ -242,15 +323,15 @@ const styles = StyleSheet.create({
     height: 220,
   },
   heroDexNumber: {
+    ...TYPO.subtitle2,
     color: withAlpha(PALETTE.white, 0.85),
-    fontSize: 14,
-    fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
   heroName: {
-    color: PALETTE.white,
+    ...TYPO.headline,
     fontSize: 32,
-    fontWeight: '800',
+    lineHeight: 40,
+    color: PALETTE.white,
   },
   heroTypes: {
     flexDirection: 'row',
@@ -258,38 +339,69 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   heroCta: {
-    marginTop: 8,
-    color: PALETTE.white,
-    fontSize: 14,
-    fontWeight: '600',
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingLeft: 14,
+    paddingRight: 10,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: PALETTE.white,
+  },
+  heroCtaText: {
+    ...TYPO.subtitle2,
+    color: PALETTE.dark,
   },
   actions: {
+    flexDirection: 'row',
     gap: 12,
   },
   actionCard: {
+    flex: 1,
     backgroundColor: PALETTE.white,
     borderRadius: 16,
-    padding: 16,
+    // A thick accent edge is what keeps the two tiles telling themselves apart.
+    borderTopWidth: 4,
+    padding: 14,
     gap: 4,
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   actionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...TYPO.subtitle1,
+    fontSize: 16,
+    lineHeight: 20,
     color: PALETTE.dark,
   },
   actionSubtitle: {
-    fontSize: 13,
+    ...TYPO.body3,
     color: PALETTE.medium,
   },
-  actionBadge: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    fontSize: 12,
-    fontWeight: '700',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: 'hidden',
+  actionMetric: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginTop: 6,
+  },
+  actionValue: {
+    ...TYPO.headline,
+    fontVariant: ['tabular-nums'],
+  },
+  actionUnit: {
+    ...TYPO.body3,
+    color: PALETTE.medium,
   },
   pressed: {
     opacity: 0.75,
