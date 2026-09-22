@@ -23,6 +23,11 @@ interface RawPokemon {
   types: { slot: number; type: { name: string } }[];
 }
 
+/** Subset of the PokéAPI v2 `/pokemon-species/{id}` response that we actually read. */
+interface RawSpecies {
+  names: { name: string; language: { name: string } }[];
+}
+
 export class PokeApiError extends Error {
   constructor(
     message: string,
@@ -37,11 +42,19 @@ export function isSupportedDexId(id: number): id is NationalDexId {
   return Number.isInteger(id) && id >= NATIONAL_DEX_MIN && id <= NATIONAL_DEX_MAX;
 }
 
-function normalizePokemon(raw: RawPokemon): PokemonSummary {
+function pickLocalizedName(species: RawSpecies, language: string): string | undefined {
+  return species.names.find((entry) => entry.language.name === language)?.name;
+}
+
+function normalizePokemon(raw: RawPokemon, species: RawSpecies): PokemonSummary {
   const artwork = raw.sprites.other?.['official-artwork'];
+  // Fall back en → apiName so a missing translation never breaks the UI.
+  const en = pickLocalizedName(species, 'en') ?? raw.name;
+  const fr = pickLocalizedName(species, 'fr') ?? en;
   return {
     id: raw.id,
     apiName: raw.name,
+    names: { fr, en },
     sprites: {
       normal: artwork?.front_default ?? raw.sprites.front_default,
       shiny: artwork?.front_shiny ?? raw.sprites.front_shiny,
@@ -50,19 +63,30 @@ function normalizePokemon(raw: RawPokemon): PokemonSummary {
   };
 }
 
-/** Fetch and normalize one Pokémon. Rejects IDs outside 1–251 without a network call. */
+async function getJson<T>(path: string, id: number): Promise<T> {
+  const response = await fetch(`${POKEAPI_BASE_URL}/${path}/${id}`);
+  if (!response.ok) {
+    throw new PokeApiError(`PokéAPI request ${path}/${id} failed (${response.status}).`, response.status);
+  }
+  return (await response.json()) as T;
+}
+
+/**
+ * Fetch and normalize one Pokémon (detail + species for localized names).
+ * Rejects IDs outside 1–251 without a network call.
+ */
 export async function fetchPokemonById(id: number): Promise<PokemonSummary> {
   if (!isSupportedDexId(id)) {
     throw new RangeError(
       `Pokémon #${id} is outside the supported National Dex range ${NATIONAL_DEX_MIN}–${NATIONAL_DEX_MAX}.`,
     );
   }
-  const response = await fetch(`${POKEAPI_BASE_URL}/pokemon/${id}`);
-  if (!response.ok) {
-    throw new PokeApiError(`PokéAPI request for #${id} failed (${response.status}).`, response.status);
-  }
-  const raw = (await response.json()) as RawPokemon;
-  return normalizePokemon(raw);
+  // For #001–#251, pokemon and pokemon-species share the same id.
+  const [raw, species] = await Promise.all([
+    getJson<RawPokemon>('pokemon', id),
+    getJson<RawSpecies>('pokemon-species', id),
+  ]);
+  return normalizePokemon(raw, species);
 }
 
 export interface FetchPokemonBatchOptions {

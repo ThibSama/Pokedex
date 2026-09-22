@@ -7,9 +7,16 @@ export interface PokemonSummary {
   id: NationalDexId;
   /** Canonical PokéAPI resource name, e.g. "umbreon". */
   apiName: string;
+  /** Localized display names from PokéAPI species data. French is the default UI name. */
+  names: PokemonNames;
   sprites: PokemonSprites;
   /** Type names ordered by PokéAPI slot (primary first), e.g. ["grass", "poison"]. */
   types: string[];
+}
+
+export interface PokemonNames {
+  fr: string;
+  en: string;
 }
 
 export interface PokemonSprites {
