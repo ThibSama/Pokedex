@@ -20,6 +20,9 @@ export const TYPE_COLORS: Record<string, string> = {
   water: '#6493EB',
 };
 
+/** Standard Pokémon types, alphabetically — the filter's canonical option list. */
+export const TYPE_NAMES: readonly string[] = Object.keys(TYPE_COLORS).sort();
+
 export function getTypeColor(type: string | undefined): string {
   return (type && TYPE_COLORS[type]) ?? TYPE_COLORS.normal;
 }

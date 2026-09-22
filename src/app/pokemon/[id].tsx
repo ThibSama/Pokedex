@@ -4,7 +4,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchPokemonDetails, isSupportedDexId, NATIONAL_DEX_MAX, NATIONAL_DEX_MIN } from '@/api/pokeApi';
+import {
+  fetchPokemonDetails,
+  isSupportedDexId,
+  NATIONAL_DEX_MAX,
+  NATIONAL_DEX_MIN,
+  resolveSprite,
+} from '@/api/pokeApi';
 import { IconButton, PrimaryButton, StateView } from '@/components/Controls';
 import { CryButton } from '@/components/CryButton';
 import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
@@ -33,6 +39,12 @@ const STAT_ROWS: { key: keyof PokemonStats; label: string }[] = [
 ];
 const STAT_STAGGER_MS = 80;
 
+/**
+ * How tall the stats table may grow on a tall screen. Past this the card's own
+ * distribution takes over, so the table never turns into a stretched column.
+ */
+const STATS_MAX_HEIGHT = STAT_ROWS.length * 40 + (STAT_ROWS.length - 1) * SPACING.md;
+
 const ARTWORK_SIZE = 200;
 const ARTWORK_OVERLAP = 60;
 /** Figma hero watermark: an oversized, barely-there Pokéball behind the artwork. */
@@ -56,7 +68,7 @@ function goToDexId(id: number) {
 }
 
 export default function PokemonDetailScreen() {
-  const { id: idParam } = useLocalSearchParams<{ id: string }>();
+  const { id: idParam, variant: variantParam } = useLocalSearchParams<{ id: string; variant?: string }>();
   const id = parseDexId(idParam);
 
   const { hydrated, isFavorite, toggleFavorite } = useFavorites();
@@ -64,7 +76,9 @@ export default function PokemonDetailScreen() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   // Local UI state only: switches between already-fetched data, never refetches.
-  const [variant, setVariant] = useState<SpriteVariant>('normal');
+  // A route variant (the Home hero, a Collection slot) opens the screen on that
+  // presentation; anything else — including the plain Pokédex list — is Normal.
+  const [variant, setVariant] = useState<SpriteVariant>(variantParam === 'shiny' ? 'shiny' : 'normal');
   const [language, setLanguage] = useState<LanguageCode>('fr');
 
   useEffect(() => {
@@ -137,8 +151,11 @@ export default function PokemonDetailScreen() {
   }
 
   const { details } = state;
-  const spriteUrl = details.sprites[variant];
   const shinyAvailable = details.sprites.shiny !== null;
+  // A shiny the API has no artwork for falls back to Normal rather than showing
+  // nothing, and the control below reflects that fallback.
+  const effectiveVariant: SpriteVariant = variant === 'shiny' && !shinyAvailable ? 'normal' : variant;
+  const spriteUrl = resolveSprite(details.sprites, effectiveVariant);
   const name = details.names[language];
   const favorite = isFavorite(details.id);
 
@@ -167,7 +184,7 @@ export default function PokemonDetailScreen() {
                 source={spriteUrl}
                 style={styles.artwork}
                 contentFit="contain"
-                accessibilityLabel={`${name} (${variant})`}
+                accessibilityLabel={`${name} (${effectiveVariant})`}
               />
             ) : (
               <View style={[styles.artwork, styles.artworkMissing]}>
@@ -198,7 +215,7 @@ export default function PokemonDetailScreen() {
                   { key: 'normal', label: 'Normal' },
                   { key: 'shiny', label: 'Shiny', disabled: !shinyAvailable },
                 ]}
-                value={variant}
+                value={effectiveVariant}
                 onChange={setVariant}
               />
               <Segmented
@@ -217,7 +234,7 @@ export default function PokemonDetailScreen() {
                 accent={accent}
                 active={favorite}
                 disabled={!hydrated}
-                onPress={() => toggleFavorite(details.id, variant)}
+                onPress={() => toggleFavorite(details.id, effectiveVariant)}
                 accessibilityLabel={
                   favorite ? `Retirer ${name} de la collection` : `Ajouter ${name} à la collection`
                 }
@@ -244,7 +261,7 @@ export default function PokemonDetailScreen() {
             <Text style={styles.description}>{details.description ?? 'Aucune description disponible.'}</Text>
           </View>
 
-          <View style={styles.group}>
+          <View style={[styles.group, styles.statsGroup]}>
             <Text style={[styles.sectionTitle, { color: accent }]}>Base Stats</Text>
             <View style={styles.stats}>
               {STAT_ROWS.map(({ key, label }, index) => (
@@ -453,6 +470,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...TYPO.subtitle1,
+    fontSize: 16,
+    lineHeight: 20,
     textAlign: 'center',
   },
   about: {
@@ -494,7 +513,16 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
   },
   stats: {
-    gap: SPACING.sm,
+    gap: SPACING.md,
+    // On a tall screen the table itself absorbs the spare height — up to
+    // STATS_MAX_HEIGHT — so the card never opens large gaps between its
+    // sections, and the short layout (which has no spare height) is untouched.
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    maxHeight: STATS_MAX_HEIGHT,
+  },
+  statsGroup: {
+    flexGrow: 1,
   },
   pressed: {
     opacity: OPACITY.pressed,

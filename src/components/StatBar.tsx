@@ -9,12 +9,15 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { withAlpha } from '@/constants/typeColors';
-import { COLORS } from '@/theme/tokens';
+import { COLORS, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 
 /** Maximum base stat in the main series; bars are scaled against it. */
 export const MAX_BASE_STAT = 255;
 const FILL_DURATION_MS = 800;
+
+/** Track thickness. Figma drew 4px; the row is legible at phone distance from 6. */
+const TRACK_HEIGHT = 6;
 
 interface StatBarProps {
   label: string;
@@ -59,32 +62,35 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SPACING.sm,
+    // The row is taller than its 16px text so the table reads as a table.
+    minHeight: 24,
   },
   label: {
-    ...TYPO.subtitle3,
-    width: 32,
+    ...TYPO.subtitle2,
+    width: 36,
     textAlign: 'right',
   },
   divider: {
     width: 1,
-    height: 16,
+    height: 20,
     backgroundColor: COLORS.light,
   },
   value: {
-    ...TYPO.body3,
-    width: 24,
+    ...TYPO.body2,
+    width: 28,
     color: COLORS.dark,
     fontVariant: ['tabular-nums'],
   },
   track: {
     flex: 1,
-    height: 4,
-    borderRadius: 4,
+    height: TRACK_HEIGHT,
+    // 6px tall, so the pill radius is simply a fully rounded bar.
+    borderRadius: RADIUS.pill,
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: RADIUS.pill,
   },
 });

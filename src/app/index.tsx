@@ -95,11 +95,14 @@ export default function HomeScreen() {
     setResult(null);
     setAttempt((n) => n + 1);
   }, []);
-  const openHero = useCallback(() => {
-    if (state.status === 'success') {
-      router.push({ pathname: '/pokemon/[id]', params: { id: state.pokemon.id } });
-    }
-  }, [router, state]);
+  const openHero = useCallback(
+    (variant: SpriteVariant) => {
+      if (state.status === 'success') {
+        router.push({ pathname: '/pokemon/[id]', params: { id: state.pokemon.id, variant } });
+      }
+    },
+    [router, state],
+  );
 
   const favoriteCount = favoriteIds.length;
   const isFallbackHero = hydrated && favoriteCount === 0;
@@ -146,7 +149,7 @@ export default function HomeScreen() {
             </View>
           ) : (
             <Pressable
-              onPress={openHero}
+              onPress={() => openHero(heroVariant)}
               accessibilityRole="button"
               accessibilityLabel={`${state.pokemon.names.fr}${isShinyHero ? ' shiny' : ''}, numéro ${formatDexNumber(state.pokemon.id)}, type ${state.pokemon.types.join(' et ')}`}
               accessibilityHint="Ouvre la fiche détaillée du Pokémon"

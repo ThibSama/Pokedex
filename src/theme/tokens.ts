@@ -55,6 +55,9 @@ export const RADIUS = {
   pill: 999,
 } as const;
 
+/** Dimming layer drawn behind a modal panel. */
+export const SCRIM = 'rgba(0, 0, 0, 0.45)';
+
 /** Spacing steps. Anything larger than `xxl` is a layout dimension, not spacing. */
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 } as const;
 

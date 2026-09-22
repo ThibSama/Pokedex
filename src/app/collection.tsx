@@ -181,7 +181,7 @@ function CollectionSlot({
   const sprite = resolveSprite(pokemon.sprites, variant);
 
   return (
-    <Link href={{ pathname: '/pokemon/[id]', params: { id: pokemon.id } }} asChild>
+    <Link href={{ pathname: '/pokemon/[id]', params: { id: pokemon.id, variant } }} asChild>
       <Pressable
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}

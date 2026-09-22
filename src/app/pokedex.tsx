@@ -3,28 +3,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type TextStyle,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DEFAULT_BATCH_SIZE, fetchPokemonBatch } from '@/api/pokeApi';
-import { useFrameWidth } from '@/components/AppShell';
+import { DEFAULT_BATCH_SIZE, fetchPokemonBatch, NATIONAL_DEX_TOTAL } from '@/api/pokeApi';
+import { APP_FRAME_MAX_WIDTH, useFrameWidth } from '@/components/AppShell';
 import { PrimaryButton, StateView } from '@/components/Controls';
 import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
 import { PokemonCard } from '@/components/PokemonCard';
-import { getTypeColor } from '@/constants/typeColors';
-import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SHADOW, SHELL, SPACING } from '@/theme/tokens';
+import { getTypeColor, TYPE_NAMES } from '@/constants/typeColors';
+import { COLORS, MESSAGE, OPACITY, RADIUS, SCRIM, SHADOW, SHELL, SPACING } from '@/theme/tokens';
 import { FONT_FAMILY, TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
 import { GRID_GAP, gridTileWidth } from '@/utils/grid';
 import {
   DEFAULT_LIST_OPTIONS,
   applyListOptions,
-  collectTypes,
   mergeUnique,
   type ListOptions,
   type SortMode,
@@ -43,6 +46,16 @@ const SORT_MODES = Object.keys(SORT_ICONS) as SortMode[];
 /** Figma list frame 1017:431. */
 const COLUMNS = 3;
 
+/**
+ * The browser paints its own focus ring on a text input; the field draws an
+ * app-owned focused state instead. `outlineStyle: 'none'` is valid here and
+ * react-native-web passes it through (its own modal focus trap does the same),
+ * but the React Native style type only lists the dotted/dashed/solid values, so
+ * the value is widened. Web only, so native never sees it.
+ */
+const WEB_FOCUS_RING_RESET: TextStyle =
+  Platform.OS === 'web' ? { outlineStyle: 'none' as string as TextStyle['outlineStyle'] } : {};
+
 /** Content box the grid lays out in, inside the red shell and the white sheet. */
 function gridContentWidth(frameWidth: number): number {
   return frameWidth - 2 * SHELL.inset - 2 * SHELL.listPadding;
@@ -50,6 +63,7 @@ function gridContentWidth(frameWidth: number): number {
 
 export default function PokedexListScreen() {
   const width = useFrameWidth();
+  const insets = useSafeAreaInsets();
 
   // Canonical loaded data, in fetch order. Never sorted/filtered in place.
   const [items, setItems] = useState<PokemonSummary[]>([]);
@@ -58,8 +72,11 @@ export default function PokedexListScreen() {
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [options, setOptions] = useState<ListOptions>(DEFAULT_LIST_OPTIONS);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  // Guards against concurrent duplicate page requests (e.g. repeated onEndReached).
+  // Guards against concurrent page requests; the hydration chain below relies
+  // on it to keep exactly one page in flight.
   const inFlight = useRef(false);
   const mounted = useRef(true);
 
@@ -93,43 +110,63 @@ export default function PokedexListScreen() {
     };
   }, [loadPage]);
 
-  const startLoad = (offset: number) => {
-    if (inFlight.current) return;
-    setStatus(offset === 0 ? 'loading' : 'loadingMore');
-    setErrorMessage(null);
-    loadPage(offset);
-  };
+  const startLoad = useCallback(
+    (offset: number) => {
+      if (inFlight.current) return;
+      setStatus(offset === 0 ? 'loading' : 'loadingMore');
+      setErrorMessage(null);
+      loadPage(offset);
+    },
+    [loadPage],
+  );
 
-  const loadMore = () => {
-    if (hasMore && status === 'idle') startLoad(nextOffset);
-  };
+  /**
+   * Sequential background hydration: as soon as one page has settled the next
+   * one starts on its own, so the whole Dex fills in without the user pressing
+   * anything and searching for a late entry eventually finds it.
+   *
+   * One page is ever in flight (`inFlight` plus this status gate), the chain
+   * stops on the first error — the footer then offers the retry — and it stops
+   * for good once the component unmounts.
+   */
+  useEffect(() => {
+    if (!mounted.current || !hasMore || status !== 'idle' || errorMessage !== null) return;
+    startLoad(nextOffset);
+  }, [errorMessage, hasMore, nextOffset, startLoad, status]);
 
-  const retry = () => startLoad(nextOffset);
+  const retry = useCallback(() => startLoad(nextOffset), [startLoad, nextOffset]);
+
+  const chooseType = (type: string | null) => {
+    setOptions((o) => ({ ...o, type }));
+    setFilterOpen(false);
+  };
 
   // Search/sort/filter are derived purely from client state — no network involved.
   const visible = useMemo(() => applyListOptions(items, options), [items, options]);
-  const availableTypes = useMemo(() => collectTypes(items), [items]);
   const cardWidth = useMemo(() => gridTileWidth(gridContentWidth(width), COLUMNS), [width]);
 
   const isInitialLoading = status === 'loading' && items.length === 0;
   const isInitialError = status === 'error' && items.length === 0;
+  const selectedType = options.type;
 
   return (
     <PokedexScreen>
-      {/* One coherent red header area: back, title, search, sort and type filters. */}
+      {/* One coherent red header area: back, title, search, sort and the type filter. */}
       <PokedexHeader title="Pokédex" onBack={() => goBack('/')}>
         <View style={styles.controlsRow}>
-          <View style={styles.searchField}>
+          <View style={[styles.searchField, searchFocused && styles.searchFieldFocused]}>
             <MaterialCommunityIcons name="magnify" size={18} color={COLORS.red} />
             <TextInput
               value={options.query}
               onChangeText={(query) => setOptions((o) => ({ ...o, query }))}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               placeholder="Rechercher"
               placeholderTextColor={COLORS.medium}
               autoCorrect={false}
               autoCapitalize="none"
               clearButtonMode="while-editing"
-              style={styles.searchInput}
+              style={[styles.searchInput, WEB_FOCUS_RING_RESET]}
               accessibilityLabel="Rechercher un Pokémon parmi ceux déjà chargés"
               accessibilityHint="Filtre la liste par nom français, nom anglais ou numéro du Pokédex"
             />
@@ -160,28 +197,27 @@ export default function PokedexListScreen() {
           </View>
         </View>
 
-        {/* Type filtering rides in the header so it never squeezes the grid. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}
-          style={styles.filtersScroll}>
-          <FilterChip
-            label="Tous"
-            color={null}
-            selected={options.type === null}
-            onPress={() => setOptions((o) => ({ ...o, type: null }))}
-          />
-          {availableTypes.map((type) => (
-            <FilterChip
-              key={type}
-              label={type}
-              color={getTypeColor(type)}
-              selected={options.type === type}
-              onPress={() => setOptions((o) => ({ ...o, type: o.type === type ? null : type }))}
-            />
-          ))}
-        </ScrollView>
+        {/* One compact Filter control on the header, so the type list never
+            squeezes the grid and the current filter stays readable. */}
+        <View style={styles.filterRow}>
+          <Pressable
+            onPress={() => setFilterOpen(true)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: filterOpen }}
+            accessibilityLabel={
+              selectedType === null ? 'Filtrer par type, tous les types' : `Filtrer par type, ${selectedType}`
+            }
+            style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
+            <MaterialCommunityIcons name="filter-variant" size={16} color={COLORS.red} />
+            {selectedType !== null && (
+              <View style={[styles.filterDot, { backgroundColor: getTypeColor(selectedType) }]} />
+            )}
+            <Text style={styles.filterLabel} numberOfLines={1}>
+              {selectedType ?? 'Tous'}
+            </Text>
+            <MaterialCommunityIcons name="chevron-down" size={16} color={COLORS.red} />
+          </Pressable>
+        </View>
       </PokedexHeader>
 
       <PokedexSurface>
@@ -205,8 +241,6 @@ export default function PokedexListScreen() {
             renderItem={({ item }) => <PokemonCard pokemon={item} width={cardWidth} />}
             contentContainerStyle={styles.list}
             columnWrapperStyle={styles.column}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <StateView>
@@ -220,24 +254,66 @@ export default function PokedexListScreen() {
                 loadedCount={items.length}
                 errorMessage={errorMessage}
                 onRetry={retry}
-                onLoadMore={loadMore}
               />
             }
           />
         )}
       </PokedexSurface>
+
+      {/* The selector rides above the screen, so the header keeps one control. */}
+      <Modal
+        visible={filterOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFilterOpen(false)}>
+        <Pressable
+          style={styles.filterBackdrop}
+          onPress={() => setFilterOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer le sélecteur de type">
+          {/* Taps on the panel itself are swallowed, so only the backdrop closes it. */}
+          <Pressable
+            style={[styles.filterPanel, { paddingBottom: insets.bottom + SPACING.lg }]}
+            onPress={noop}
+            accessibilityViewIsModal>
+            <Text style={styles.filterPanelTitle}>Type</Text>
+            <ScrollView contentContainerStyle={styles.filterOptions} showsVerticalScrollIndicator={false}>
+              <FilterOption
+                label="Tous"
+                color={null}
+                selected={selectedType === null}
+                onPress={() => chooseType(null)}
+              />
+              {TYPE_NAMES.map((type) => (
+                <FilterOption
+                  key={type}
+                  label={type}
+                  color={getTypeColor(type)}
+                  selected={selectedType === type}
+                  onPress={() => chooseType(type)}
+                />
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </PokedexScreen>
   );
 }
 
-function FilterChip({
+function noop() {
+  // Intentionally empty: this handler only stops a tap from reaching the backdrop.
+}
+
+/** One selectable type in the filter panel: color indicator plus label. */
+function FilterOption({
   label,
   color,
   selected,
   onPress,
 }: {
   label: string;
-  /** Type accent, or null for the catch-all chip, which shows no dot. */
+  /** Type accent, or null for the catch-all option, which shows no dot. */
   color: string | null;
   selected: boolean;
   onPress: () => void;
@@ -247,10 +323,18 @@ function FilterChip({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={label === 'Tous' ? 'Afficher tous les types' : `Filtrer par le type ${label}`}
-      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}>
-      {color !== null && <View style={[styles.chipDot, { backgroundColor: color }]} />}
-      <Text style={[styles.chipText, selected && { color: color ?? COLORS.red }]}>{label}</Text>
+      accessibilityLabel={label === 'Tous' ? 'Tous les types' : `Type ${label}`}
+      style={({ pressed }) => [
+        styles.option,
+        selected && { backgroundColor: color ?? COLORS.red },
+        pressed && styles.pressed,
+      ]}>
+      {color !== null && (
+        <View style={[styles.optionDot, { backgroundColor: selected ? COLORS.white : color }]} />
+      )}
+      <Text style={[styles.optionText, selected && styles.optionTextSelected]} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -261,20 +345,20 @@ function ListFooter({
   loadedCount,
   errorMessage,
   onRetry,
-  onLoadMore,
 }: {
   status: LoadStatus;
   hasMore: boolean;
   loadedCount: number;
   errorMessage: string | null;
   onRetry: () => void;
-  onLoadMore: () => void;
 }) {
   if (status === 'loadingMore') {
     return (
-      <View style={styles.footer}>
+      <View style={styles.footer} accessibilityRole="progressbar">
         <ActivityIndicator color={COLORS.red} />
-        <Text style={MESSAGE.muted}>Chargement…</Text>
+        <Text style={MESSAGE.muted}>
+          {loadedCount} / {NATIONAL_DEX_TOTAL} Pokémon chargés
+        </Text>
       </View>
     );
   }
@@ -294,14 +378,13 @@ function ListFooter({
       </View>
     );
   }
+  // Between two pages of the hydration chain: brief, and the next page is
+  // already on its way.
   return (
     <View style={styles.footer}>
-      <Text style={MESSAGE.muted}>{loadedCount} Pokémon chargés.</Text>
-      <PrimaryButton
-        label="Charger plus"
-        onPress={onLoadMore}
-        accessibilityLabel="Charger plus de Pokémon"
-      />
+      <Text style={MESSAGE.muted}>
+        {loadedCount} / {NATIONAL_DEX_TOTAL} Pokémon chargés
+      </Text>
     </View>
   );
 }
@@ -320,9 +403,16 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     height: 40,
     borderRadius: RADIUS.field,
-    paddingHorizontal: SPACING.md,
+    // The focused state is this border; it is reserved (transparent) so nothing
+    // moves when the field takes focus.
+    borderWidth: 2,
+    borderColor: 'transparent',
+    paddingHorizontal: SPACING.md - 2,
     backgroundColor: COLORS.white,
     ...SHADOW.float,
+  },
+  searchFieldFocused: {
+    borderColor: COLORS.dark,
   },
   searchInput: {
     flex: 1,
@@ -351,36 +441,84 @@ const styles = StyleSheet.create({
   sortButtonSelected: {
     backgroundColor: COLORS.red,
   },
-  filtersScroll: {
-    flexGrow: 0,
-  },
-  filters: {
+  filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
     paddingHorizontal: SHELL.headerPadding,
   },
-  chip: {
+  filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 28,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.chip,
-    backgroundColor: OVERLAY.fill,
-  },
-  chipSelected: {
+    height: 32,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.pill,
     backgroundColor: COLORS.white,
+    ...SHADOW.float,
   },
-  chipDot: {
+  filterDot: {
     width: 8,
     height: 8,
     borderRadius: RADIUS.pill,
   },
-  chipText: {
+  filterLabel: {
     ...TYPO.subtitle3,
-    color: COLORS.white,
+    color: COLORS.dark,
     textTransform: 'capitalize',
+  },
+  filterBackdrop: {
+    flex: 1,
+    backgroundColor: SCRIM,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  filterPanel: {
+    width: '100%',
+    // The web frame caps the app at a phone width; the panel follows it.
+    maxWidth: APP_FRAME_MAX_WIDTH,
+    maxHeight: '75%',
+    paddingTop: SPACING.lg,
+    borderTopLeftRadius: RADIUS.card,
+    borderTopRightRadius: RADIUS.card,
+    backgroundColor: COLORS.white,
+  },
+  filterPanelTitle: {
+    ...TYPO.subtitle1,
+    color: COLORS.dark,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+  },
+  option: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.background,
+  },
+  optionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: RADIUS.pill,
+  },
+  optionText: {
+    ...TYPO.body2,
+    color: COLORS.dark,
+    textTransform: 'capitalize',
+  },
+  optionTextSelected: {
+    ...TYPO.subtitle2,
+    color: COLORS.white,
   },
   list: {
     paddingHorizontal: SHELL.listPadding,
