@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { fetchPokemonDetails, isSupportedDexId, NATIONAL_DEX_MAX, NATIONAL_DEX_MIN } from '@/api/pokeApi';
+import { StatBar } from '@/components/StatBar';
+import { TypeBadge } from '@/components/TypeBadge';
+import { getTypeColor, PALETTE } from '@/constants/typeColors';
 import type { LanguageCode, PokemonDetails, PokemonStats } from '@/types/pokemon';
 import { formatDexNumber } from '@/utils/pokemonList';
 
@@ -14,14 +17,16 @@ type LoadState =
 
 type SpriteVariant = 'normal' | 'shiny';
 
-const STAT_LABELS: { key: keyof PokemonStats; label: string }[] = [
-  { key: 'hp', label: 'PV' },
-  { key: 'attack', label: 'Attaque' },
-  { key: 'defense', label: 'Défense' },
-  { key: 'specialAttack', label: 'Attaque Spé.' },
-  { key: 'specialDefense', label: 'Défense Spé.' },
-  { key: 'speed', label: 'Vitesse' },
+/** Figma order and labels. */
+const STAT_ROWS: { key: keyof PokemonStats; label: string }[] = [
+  { key: 'hp', label: 'HP' },
+  { key: 'attack', label: 'ATK' },
+  { key: 'defense', label: 'DEF' },
+  { key: 'specialAttack', label: 'SATK' },
+  { key: 'specialDefense', label: 'SDEF' },
+  { key: 'speed', label: 'SPD' },
 ];
+const STAT_STAGGER_MS = 80;
 
 /** Parse the route param into a supported Dex id, or null when invalid. */
 function parseDexId(param: string | string[] | undefined): number | null {
@@ -29,6 +34,10 @@ function parseDexId(param: string | string[] | undefined): number | null {
   if (raw === undefined || !/^\d+$/.test(raw)) return null;
   const id = Number(raw);
   return isSupportedDexId(id) ? id : null;
+}
+
+function formatMetric(value: number, unit: string) {
+  return `${value.toFixed(1).replace('.', ',')} ${unit}`;
 }
 
 export default function PokemonDetailScreen() {
@@ -63,37 +72,50 @@ export default function PokemonDetailScreen() {
     setAttempt((n) => n + 1);
   }
 
+  const accent = state.status === 'success' ? getTypeColor(state.details.types[0]) : PALETTE.medium;
+  const headerOptions = {
+    headerStyle: { backgroundColor: accent },
+    headerTintColor: PALETTE.white,
+    headerShadowVisible: false,
+    headerTitleStyle: { color: PALETTE.white, fontSize: 24, fontWeight: '700' as const },
+    headerBackButtonDisplayMode: 'minimal' as const,
+  };
+
   if (id === null) {
     return (
-      <View style={styles.centered}>
-        <Stack.Screen options={{ title: 'Pokémon' }} />
-        <Text style={styles.error}>Identifiant invalide.</Text>
-        <Text style={styles.muted}>
-          « {String(idParam)} » n’est pas un numéro du Pokédex national ({NATIONAL_DEX_MIN}–{NATIONAL_DEX_MAX}).
-        </Text>
+      <View style={[styles.centered, { backgroundColor: accent }]}>
+        <Stack.Screen options={{ ...headerOptions, title: 'Pokémon' }} />
+        <View style={styles.messageCard}>
+          <Text style={styles.error}>Identifiant invalide.</Text>
+          <Text style={styles.muted}>
+            « {String(idParam)} » n’est pas un numéro du Pokédex national ({NATIONAL_DEX_MIN}–{NATIONAL_DEX_MAX}).
+          </Text>
+        </View>
       </View>
     );
   }
 
   if (state.status === 'loading') {
     return (
-      <View style={styles.centered}>
-        <Stack.Screen options={{ title: formatDexNumber(id) }} />
-        <ActivityIndicator />
-        <Text style={styles.muted}>Chargement de {formatDexNumber(id)}…</Text>
+      <View style={[styles.centered, { backgroundColor: accent }]}>
+        <Stack.Screen options={{ ...headerOptions, title: formatDexNumber(id) }} />
+        <ActivityIndicator color={PALETTE.white} />
+        <Text style={styles.onAccent}>Chargement de {formatDexNumber(id)}…</Text>
       </View>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <View style={styles.centered}>
-        <Stack.Screen options={{ title: formatDexNumber(id) }} />
-        <Text style={styles.error}>Impossible de charger {formatDexNumber(id)}.</Text>
-        <Text style={styles.muted}>{state.message}</Text>
-        <Pressable onPress={retry} style={styles.button}>
-          <Text style={styles.buttonText}>Réessayer</Text>
-        </Pressable>
+      <View style={[styles.centered, { backgroundColor: accent }]}>
+        <Stack.Screen options={{ ...headerOptions, title: formatDexNumber(id) }} />
+        <View style={styles.messageCard}>
+          <Text style={styles.error}>Impossible de charger {formatDexNumber(id)}.</Text>
+          <Text style={styles.muted}>{state.message}</Text>
+          <Pressable onPress={retry} style={[styles.button, { backgroundColor: accent }]}>
+            <Text style={styles.buttonText}>Réessayer</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -101,118 +123,134 @@ export default function PokemonDetailScreen() {
   const { details } = state;
   const spriteUrl = details.sprites[variant];
   const shinyAvailable = details.sprites.shiny !== null;
+  const name = details.names[language];
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: details.names[language] }} />
-
-      <View style={styles.header}>
-        <Text style={styles.dexNumber}>{formatDexNumber(details.id)}</Text>
-        <Text style={styles.name}>{details.names[language]}</Text>
-        <Text style={styles.muted}>{details.apiName}</Text>
-        <View style={styles.types}>
-          {details.types.map((type) => (
-            <Text key={type} style={styles.type}>
-              {type}
-            </Text>
-          ))}
+    <View style={[styles.screen, { backgroundColor: accent }]}>
+      <Stack.Screen
+        options={{
+          ...headerOptions,
+          title: name,
+          headerRight: () => <Text style={styles.headerDexNumber}>{formatDexNumber(details.id)}</Text>,
+        }}
+      />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Artwork overlaps the card, as in the Figma. */}
+        <View style={styles.artworkSlot}>
+          {spriteUrl ? (
+            <Image
+              source={spriteUrl}
+              style={styles.artwork}
+              contentFit="contain"
+              accessibilityLabel={`${name} (${variant})`}
+            />
+          ) : (
+            <View style={[styles.artwork, styles.artworkMissing]}>
+              <Text style={styles.onAccent}>Aucune image</Text>
+            </View>
+          )}
         </View>
-      </View>
 
-      {spriteUrl ? (
-        <Image
-          source={spriteUrl}
-          style={styles.artwork}
-          contentFit="contain"
-          accessibilityLabel={`${details.names[language]} (${variant})`}
-        />
-      ) : (
-        <View style={[styles.artwork, styles.artworkMissing]}>
-          <Text style={styles.muted}>Aucune image</Text>
+        <View style={styles.card}>
+          <View style={styles.types}>
+            {details.types.map((type) => (
+              <TypeBadge key={type} type={type} />
+            ))}
+          </View>
+
+          {/* Compact local toggles; they only index into already-loaded data. */}
+          <View style={styles.toggles}>
+            <Toggle label="Normal" selected={variant === 'normal'} onPress={() => setVariant('normal')} accent={accent} />
+            <Toggle
+              label="Shiny"
+              selected={variant === 'shiny'}
+              disabled={!shinyAvailable}
+              onPress={() => setVariant('shiny')}
+              accent={accent}
+            />
+            <View style={styles.toggleGap} />
+            <Toggle label="FR" selected={language === 'fr'} onPress={() => setLanguage('fr')} accent={accent} />
+            <Toggle label="EN" selected={language === 'en'} onPress={() => setLanguage('en')} accent={accent} />
+          </View>
+
+          <Text style={[styles.sectionTitle, { color: accent }]}>About</Text>
+          <View style={styles.about}>
+            <AboutColumn label="Weight" lines={[formatMetric(details.weightKg, 'kg')]} />
+            <View style={styles.aboutDivider} />
+            <AboutColumn label="Height" lines={[formatMetric(details.heightM, 'm')]} />
+            <View style={styles.aboutDivider} />
+            <AboutColumn
+              label="Moves"
+              lines={details.abilities.map((a) => (a.isHidden ? `${a.name} (hidden)` : a.name))}
+            />
+          </View>
+
+          <Text style={styles.description}>{details.description ?? 'Aucune description disponible.'}</Text>
+
+          <Text style={[styles.sectionTitle, { color: accent }]}>Base Stats</Text>
+          <View style={styles.stats}>
+            {STAT_ROWS.map(({ key, label }, index) => (
+              <StatBar
+                key={key}
+                label={label}
+                value={details.stats[key]}
+                color={accent}
+                delayMs={index * STAT_STAGGER_MS}
+              />
+            ))}
+          </View>
         </View>
-      )}
-
-      <View style={styles.toggles}>
-        <View style={styles.toggleGroup}>
-          <Chip label="Normal" selected={variant === 'normal'} onPress={() => setVariant('normal')} />
-          <Chip
-            label="Shiny"
-            selected={variant === 'shiny'}
-            disabled={!shinyAvailable}
-            onPress={() => setVariant('shiny')}
-          />
-        </View>
-        <View style={styles.toggleGroup}>
-          <Chip label="FR" selected={language === 'fr'} onPress={() => setLanguage('fr')} />
-          <Chip label="EN" selected={language === 'en'} onPress={() => setLanguage('en')} />
-        </View>
-      </View>
-
-      <Section title="Description">
-        <Text style={styles.body}>{details.description ?? 'Aucune description disponible.'}</Text>
-        {details.descriptionLanguage && details.descriptionLanguage !== language && (
-          <Text style={styles.muted}>(texte en {details.descriptionLanguage.toUpperCase()})</Text>
-        )}
-      </Section>
-
-      <Section title="Caractéristiques">
-        <Row label="Taille" value={`${details.heightM.toFixed(1)} m`} />
-        <Row label="Poids" value={`${details.weightKg.toFixed(1)} kg`} />
-        <Row
-          label="Talents"
-          value={details.abilities.map((a) => (a.isHidden ? `${a.name} (caché)` : a.name)).join(', ')}
-        />
-      </Section>
-
-      <Section title="Statistiques de base">
-        {STAT_LABELS.map(({ key, label }) => (
-          <Row key={key} label={label} value={String(details.stats[key])} />
-        ))}
-      </Section>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-function Chip({
+function Toggle({
   label,
   selected,
   disabled = false,
+  accent,
   onPress,
 }: {
   label: string;
   selected: boolean;
   disabled?: boolean;
+  accent: string;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={[styles.chip, selected && styles.chipSelected, disabled && styles.chipDisabled]}>
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+      hitSlop={6}
+      style={[styles.toggle, selected && { backgroundColor: accent }, disabled && styles.toggleDisabled]}>
+      <Text style={[styles.toggleText, selected && styles.toggleTextSelected]}>{label}</Text>
     </Pressable>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function AboutColumn({ label, lines }: { label: string; lines: string[] }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+    <View style={styles.aboutColumn}>
+      <View style={styles.aboutValues}>
+        {lines.map((line) => (
+          <Text key={line} style={styles.aboutValue}>
+            {line}
+          </Text>
+        ))}
+      </View>
+      <Text style={styles.aboutLabel}>{label}</Text>
     </View>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
-}
+const ARTWORK_SIZE = 200;
+const ARTWORK_OVERLAP = 60;
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',
@@ -221,122 +259,144 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   content: {
-    padding: 16,
-    gap: 16,
+    paddingHorizontal: 4,
+    paddingBottom: 4,
   },
-  header: {
+  artworkSlot: {
     alignItems: 'center',
-    gap: 4,
-  },
-  dexNumber: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontVariant: ['tabular-nums'],
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  types: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
-  },
-  type: {
-    fontSize: 13,
-    textTransform: 'capitalize',
-    color: '#374151',
-    backgroundColor: '#e5e7eb',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 999,
+    marginTop: 8,
+    marginBottom: -ARTWORK_OVERLAP,
+    zIndex: 1,
   },
   artwork: {
-    width: 220,
-    height: 220,
-    alignSelf: 'center',
+    width: ARTWORK_SIZE,
+    height: ARTWORK_SIZE,
   },
   artworkMissing: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
+  },
+  card: {
+    backgroundColor: PALETTE.white,
+    borderRadius: 8,
+    paddingTop: ARTWORK_OVERLAP + 8,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 16,
+    minHeight: 480,
+  },
+  headerDexNumber: {
+    color: PALETTE.white,
+    fontSize: 12,
+    fontWeight: '700',
+    marginRight: 20,
+  },
+  types: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
   },
   toggles: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 24,
+    alignItems: 'center',
+    gap: 6,
   },
-  toggleGroup: {
-    flexDirection: 'row',
-    gap: 8,
+  toggleGap: {
+    width: 12,
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#e5e7eb',
+  toggle: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: PALETTE.background,
   },
-  chipSelected: {
-    backgroundColor: '#1d4ed8',
-  },
-  chipDisabled: {
+  toggleDisabled: {
     opacity: 0.4,
   },
-  chipText: {
-    fontSize: 13,
-    color: '#374151',
+  toggleText: {
+    fontSize: 10,
+    color: PALETTE.medium,
   },
-  chipTextSelected: {
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  section: {
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+  toggleTextSelected: {
+    color: PALETTE.white,
+    fontWeight: '700',
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
   },
-  body: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  row: {
+  about: {
     flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  aboutColumn: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
+    paddingHorizontal: 8,
   },
-  rowLabel: {
-    color: '#6b7280',
+  aboutDivider: {
+    width: 1,
+    backgroundColor: PALETTE.light,
   },
-  rowValue: {
-    flexShrink: 1,
-    textAlign: 'right',
-    fontWeight: '500',
+  aboutValues: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  aboutValue: {
+    fontSize: 12,
+    color: PALETTE.dark,
+    textAlign: 'center',
     textTransform: 'capitalize',
   },
+  aboutLabel: {
+    fontSize: 10,
+    color: PALETTE.medium,
+  },
+  description: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: PALETTE.dark,
+  },
+  stats: {
+    gap: 8,
+  },
+  messageCard: {
+    backgroundColor: PALETTE.white,
+    borderRadius: 8,
+    padding: 20,
+    gap: 12,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  onAccent: {
+    color: PALETTE.white,
+    fontSize: 12,
+    textAlign: 'center',
+  },
   muted: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 12,
+    color: PALETTE.medium,
     textAlign: 'center',
   },
   error: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#b91c1c',
+    fontSize: 14,
+    fontWeight: '700',
+    color: PALETTE.dark,
+    textAlign: 'center',
   },
   button: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#1d4ed8',
   },
   buttonText: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: PALETTE.white,
+    fontWeight: '700',
+    fontSize: 12,
   },
 });
