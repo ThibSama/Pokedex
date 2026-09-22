@@ -3,7 +3,7 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import { PALETTE } from '@/constants/typeColors';
+import { COLORS, OPACITY, RADIUS, SHADOW } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
 import { formatDexNumber } from '@/utils/pokemonList';
@@ -59,25 +59,21 @@ const styles = StyleSheet.create({
    * fixed — 2 (padding) + 12 (Dex number) + 72 (artwork) + 22 (name band).
    */
   tile: {
-    backgroundColor: PALETTE.white,
-    borderRadius: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.sheet,
     paddingTop: TILE_PADDING_TOP,
     alignItems: 'center',
     overflow: 'hidden',
     // Figma card elevation; `elevation` is Android-only and ignored elsewhere.
-    shadowColor: '#000000',
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    ...SHADOW.tile,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: OPACITY.pressed,
   },
   tileDexNumber: {
     ...TYPO.caption,
     alignSelf: 'flex-end',
-    color: PALETTE.medium,
+    color: COLORS.medium,
     fontVariant: ['tabular-nums'],
     paddingRight: 8,
   },
@@ -87,15 +83,15 @@ const styles = StyleSheet.create({
   },
   tileFooter: {
     width: '100%',
-    backgroundColor: PALETTE.background,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+    backgroundColor: COLORS.background,
+    borderBottomLeftRadius: RADIUS.sheet,
+    borderBottomRightRadius: RADIUS.sheet,
     paddingVertical: 3,
     paddingHorizontal: 4,
   },
   tileName: {
     ...TYPO.body3,
-    color: PALETTE.dark,
+    color: COLORS.dark,
     textAlign: 'center',
   },
 });

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { PALETTE } from '@/constants/typeColors';
+import { COLORS, SHADOW } from '@/theme/tokens';
 
 /**
  * Widest the app is ever painted. Mobile stays the product authority, so on a
@@ -44,17 +44,14 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: PALETTE.light,
+    backgroundColor: COLORS.light,
   },
   frame: {
     flex: 1,
     width: '100%',
     maxWidth: APP_FRAME_MAX_WIDTH,
     overflow: 'hidden',
-    backgroundColor: PALETTE.background,
-    shadowColor: '#000000',
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 0 },
+    backgroundColor: COLORS.background,
+    ...SHADOW.frame,
   },
 });

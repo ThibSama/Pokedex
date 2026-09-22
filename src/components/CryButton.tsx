@@ -1,10 +1,8 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
 
 import { getPokemonCryUrl } from '@/api/pokemonAudio';
-import { PALETTE } from '@/constants/typeColors';
+import { IconButton } from '@/components/Controls';
 
 /** Configure the audio session once per app run, so cries play in iOS silent mode. */
 let audioModeConfigured = false;
@@ -21,8 +19,8 @@ interface CryButtonProps {
  * depends only on `apiName`, so Normal/Shiny and FR/EN re-renders neither
  * reload the audio nor trigger any network request for detail data.
  *
- * Rendered as a round icon button so it sits in the detail screen's secondary
- * action row without competing with the Figma hierarchy.
+ * Rendered as one of the detail screen's round icon buttons, so it sits in the
+ * secondary action row without competing with the Figma hierarchy.
  */
 export function CryButton({ apiName, accent }: CryButtonProps) {
   const url = getPokemonCryUrl(apiName);
@@ -53,37 +51,14 @@ export function CryButton({ apiName, accent }: CryButtonProps) {
   }
 
   return (
-    <Pressable
-      onPress={playCry}
+    <IconButton
+      icon={unavailable ? 'volume-off' : 'volume-high'}
+      accent={accent}
+      active={status.playing}
       disabled={disabled}
-      hitSlop={8}
-      accessibilityRole="button"
+      onPress={playCry}
       accessibilityLabel={unavailable ? `Cri de ${apiName} indisponible` : `Écouter le cri de ${apiName}`}
-      accessibilityState={{ disabled, busy: status.playing }}
-      style={[
-        styles.button,
-        status.playing && { backgroundColor: accent },
-        disabled && styles.buttonDisabled,
-      ]}>
-      <MaterialCommunityIcons
-        name={unavailable ? 'volume-off' : 'volume-high'}
-        size={16}
-        color={status.playing ? PALETTE.white : accent}
-      />
-    </Pressable>
+      accessibilityState={{ busy: status.playing }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: PALETTE.background,
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-});

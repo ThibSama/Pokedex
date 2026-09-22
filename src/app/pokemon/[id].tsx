@@ -1,16 +1,18 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { type ReactNode, useEffect, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchPokemonDetails, isSupportedDexId, NATIONAL_DEX_MAX, NATIONAL_DEX_MIN } from '@/api/pokeApi';
+import { IconButton, PrimaryButton, StateView } from '@/components/Controls';
 import { CryButton } from '@/components/CryButton';
+import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
 import { StatBar } from '@/components/StatBar';
 import { TypeBadge } from '@/components/TypeBadge';
-import { getTypeColor, PALETTE } from '@/constants/typeColors';
+import { getTypeColor } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
+import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { LanguageCode, PokemonDetails, PokemonStats } from '@/types/pokemon';
 import { formatDexNumber, humanizeSlug } from '@/utils/pokemonList';
@@ -48,11 +50,6 @@ function parseDexId(param: string | string[] | undefined): number | null {
 
 function formatMetric(value: number, unit: string) {
   return `${value.toFixed(1).replace('.', ',')} ${unit}`;
-}
-
-function goBack() {
-  if (router.canGoBack()) router.back();
-  else router.replace('/pokedex');
 }
 
 /** Swap the current entry rather than stacking one screen per neighbour visited. */
@@ -94,47 +91,50 @@ export default function PokemonDetailScreen() {
     setAttempt((n) => n + 1);
   }
 
-  const accent = state.status === 'success' ? getTypeColor(state.details.types[0]) : PALETTE.medium;
+  const accent = state.status === 'success' ? getTypeColor(state.details.types[0]) : COLORS.medium;
 
   if (id === null) {
     return (
-      <Shell accent={accent} title="Pokémon">
-        <View style={styles.centered}>
-          <View style={styles.messageCard}>
-            <Text style={styles.error}>Identifiant invalide.</Text>
-            <Text style={styles.muted}>
+      <PokedexScreen>
+        <PokedexHeader title="Pokémon" onBack={() => goBack('/pokedex')} />
+        <PokedexSurface>
+          <StateView>
+            <Text style={MESSAGE.error}>Identifiant invalide.</Text>
+            <Text style={MESSAGE.muted}>
               « {String(idParam)} » n’est pas un numéro du Pokédex national ({NATIONAL_DEX_MIN}–{NATIONAL_DEX_MAX}).
             </Text>
-          </View>
-        </View>
-      </Shell>
+          </StateView>
+        </PokedexSurface>
+      </PokedexScreen>
     );
   }
 
   if (state.status === 'loading') {
     return (
-      <Shell accent={accent} title="Pokémon" dexNumber={formatDexNumber(id)}>
-        <View style={styles.centered}>
-          <ActivityIndicator color={PALETTE.white} />
-          <Text style={styles.onAccent}>Chargement de {formatDexNumber(id)}…</Text>
-        </View>
-      </Shell>
+      <PokedexScreen>
+        <PokedexHeader title="Pokémon" trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
+        <PokedexSurface>
+          <StateView>
+            <ActivityIndicator color={COLORS.red} />
+            <Text style={MESSAGE.muted}>Chargement de {formatDexNumber(id)}…</Text>
+          </StateView>
+        </PokedexSurface>
+      </PokedexScreen>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <Shell accent={accent} title="Pokémon" dexNumber={formatDexNumber(id)}>
-        <View style={styles.centered}>
-          <View style={styles.messageCard}>
-            <Text style={styles.error}>Impossible de charger {formatDexNumber(id)}.</Text>
-            <Text style={styles.muted}>{state.message}</Text>
-            <Pressable onPress={retry} style={[styles.button, { backgroundColor: accent }]}>
-              <Text style={styles.buttonText}>Réessayer</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Shell>
+      <PokedexScreen>
+        <PokedexHeader title="Pokémon" trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
+        <PokedexSurface>
+          <StateView>
+            <Text style={MESSAGE.error}>Impossible de charger {formatDexNumber(id)}.</Text>
+            <Text style={MESSAGE.muted}>{state.message}</Text>
+            <PrimaryButton label="Réessayer" onPress={retry} />
+          </StateView>
+        </PokedexSurface>
+      </PokedexScreen>
     );
   }
 
@@ -145,27 +145,42 @@ export default function PokemonDetailScreen() {
   const favorite = isFavorite(details.id);
 
   return (
-    <Shell accent={accent} title={name} dexNumber={formatDexNumber(details.id)}>
+    <PokedexScreen>
+      <PokedexHeader
+        title={name}
+        trailing={formatDexNumber(details.id)}
+        onBack={() => goBack('/pokedex')}
+      />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Artwork overlaps the card, flanked by the Figma navigation chevrons. */}
-        <View style={styles.heroRow}>
-          <HeroChevron direction="previous" currentId={details.id} />
-          {spriteUrl ? (
-            <Image
-              source={spriteUrl}
-              style={styles.artwork}
-              contentFit="contain"
-              accessibilityLabel={`${name} (${variant})`}
-            />
-          ) : (
-            <View style={[styles.artwork, styles.artworkMissing]}>
-              <Text style={styles.onAccent}>Aucune image</Text>
+        {/* The Pokémon's own color carries the hero: a rounded accent field whose
+            lower edge is where the white card starts, so the artwork straddles
+            the two the way it does in Figma. The app's red stays in the chrome. */}
+        <View style={styles.hero}>
+          <View style={[styles.heroBackdrop, { backgroundColor: accent }]} pointerEvents="none">
+            <View style={styles.watermark}>
+              <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color={OVERLAY.watermark} />
             </View>
-          )}
-          <HeroChevron direction="next" currentId={details.id} />
+          </View>
+          {/* Artwork overlaps the card below; zIndex keeps it painted on top of it. */}
+          <View style={styles.heroRow}>
+            <HeroChevron direction="previous" currentId={details.id} />
+            {spriteUrl ? (
+              <Image
+                source={spriteUrl}
+                style={styles.artwork}
+                contentFit="contain"
+                accessibilityLabel={`${name} (${variant})`}
+              />
+            ) : (
+              <View style={[styles.artwork, styles.artworkMissing]}>
+                <Text style={MESSAGE.onColor}>Aucune image</Text>
+              </View>
+            )}
+            <HeroChevron direction="next" currentId={details.id} />
+          </View>
         </View>
 
-        <View style={styles.card}>
+        <PokedexSurface variant="panel" style={styles.card}>
           {/* Three groups, so a tall viewport shares its spare height between
               them instead of dumping it all below Base Stats. On a short screen
               they simply stack as before. */}
@@ -199,26 +214,17 @@ export default function PokemonDetailScreen() {
                 onChange={setLanguage}
               />
               <CryButton apiName={details.apiName} accent={accent} />
-              <Pressable
-                onPress={() => toggleFavorite(details.id)}
+              <IconButton
+                icon={favorite ? 'heart' : 'heart-outline'}
+                accent={accent}
+                active={favorite}
                 disabled={!hydrated}
-                hitSlop={8}
-                accessibilityRole="button"
+                onPress={() => toggleFavorite(details.id)}
                 accessibilityLabel={
                   favorite ? `Retirer ${name} de la collection` : `Ajouter ${name} à la collection`
                 }
-                accessibilityState={{ disabled: !hydrated, selected: favorite }}
-                style={[
-                  styles.iconButton,
-                  favorite && { backgroundColor: accent },
-                  !hydrated && styles.disabled,
-                ]}>
-                <MaterialCommunityIcons
-                  name={favorite ? 'heart' : 'heart-outline'}
-                  size={16}
-                  color={favorite ? PALETTE.white : accent}
-                />
-              </Pressable>
+                accessibilityState={{ selected: favorite }}
+              />
             </View>
           </View>
 
@@ -254,50 +260,9 @@ export default function PokemonDetailScreen() {
               ))}
             </View>
           </View>
-        </View>
+        </PokedexSurface>
       </ScrollView>
-    </Shell>
-  );
-}
-
-/**
- * The accent-colored frame shared by every state: Pokéball watermark, custom
- * title row (back / name / #NNN) and the accent background itself.
- */
-function Shell({
-  accent,
-  title,
-  dexNumber,
-  children,
-}: {
-  accent: string;
-  title: string;
-  dexNumber?: string;
-  children: ReactNode;
-}) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[styles.screen, { backgroundColor: accent }]}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.watermark, { top: insets.top - 16 }]} pointerEvents="none">
-        <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color="rgba(255, 255, 255, 0.12)" />
-      </View>
-      <View style={[styles.titleRow, { paddingTop: insets.top + 8 }]}>
-        <Pressable
-          onPress={goBack}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Revenir à l’écran précédent"
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-          <MaterialCommunityIcons name="chevron-left" size={28} color={PALETTE.white} />
-        </Pressable>
-        <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
-          {title}
-        </Text>
-        {dexNumber !== undefined && <Text style={styles.dexNumber}>{dexNumber}</Text>}
-      </View>
-      {children}
-    </View>
+    </PokedexScreen>
   );
 }
 
@@ -322,7 +287,7 @@ function HeroChevron({ direction, currentId }: { direction: 'previous' | 'next';
       <MaterialCommunityIcons
         name={direction === 'previous' ? 'chevron-left' : 'chevron-right'}
         size={32}
-        color={PALETTE.white}
+        color={COLORS.white}
       />
     </Pressable>
   );
@@ -380,7 +345,7 @@ function AboutColumn({
       <View style={styles.aboutValues}>
         {lines.map((line) => (
           <View key={line} style={styles.aboutValueRow}>
-            {icon !== undefined && <MaterialCommunityIcons name={icon} size={14} color={PALETTE.dark} />}
+            {icon !== undefined && <MaterialCommunityIcons name={icon} size={14} color={COLORS.dark} />}
             <Text style={styles.aboutValue}>{line}</Text>
           </View>
         ))}
@@ -391,57 +356,36 @@ function AboutColumn({
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  watermark: {
-    position: 'absolute',
-    right: -16,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: 8,
-    paddingRight: 20,
-    paddingBottom: 4,
-  },
-  backButton: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    ...TYPO.headline,
-    flex: 1,
-    color: PALETTE.white,
-  },
-  dexNumber: {
-    ...TYPO.subtitle2,
-    color: PALETTE.white,
-    fontVariant: ['tabular-nums'],
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    padding: 24,
-  },
   // `flexGrow` (not `flex`) so the card fills a short viewport but still grows with content.
   content: {
     flexGrow: 1,
-    paddingHorizontal: 4,
-    paddingBottom: 4,
+    paddingHorizontal: SHELL.inset,
+    paddingBottom: SHELL.inset,
+  },
+  hero: {
+    zIndex: 1,
+  },
+  heroBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: RADIUS.sheet,
+    overflow: 'hidden',
+  },
+  watermark: {
+    position: 'absolute',
+    top: -16,
+    right: -16,
   },
   heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    paddingHorizontal: SPACING.xs,
+    // The artwork overhangs the accent field by this much and lands on the card.
     marginBottom: -ARTWORK_OVERLAP,
-    zIndex: 1,
   },
   chevron: {
     width: 32,
@@ -459,63 +403,55 @@ const styles = StyleSheet.create({
   },
   card: {
     flexGrow: 1,
-    backgroundColor: PALETTE.white,
-    borderRadius: 8,
-    paddingTop: ARTWORK_OVERLAP + 8,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 16,
+    // Room for the artwork that overhangs the top of the card.
+    paddingTop: ARTWORK_OVERLAP + SPACING.sm,
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.xl,
+    gap: SPACING.lg,
     // Spare height on a tall phone is shared between the three groups rather
     // than left as one dead block under Base Stats. A no-op once the content
     // is taller than the viewport, so 360x640 layouts are untouched.
     justifyContent: 'space-between',
   },
   group: {
-    gap: 16,
+    gap: SPACING.lg,
   },
   types: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: SPACING.lg,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: SPACING.sm,
   },
   segmented: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
     padding: 2,
-    borderRadius: 16,
-    backgroundColor: PALETTE.background,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.background,
   },
   segment: {
     height: 24,
     justifyContent: 'center',
     paddingHorizontal: 10,
-    borderRadius: 12,
+    // 24px tall, so the pill radius is what the segment already rendered as.
+    borderRadius: RADIUS.pill,
   },
   segmentText: {
     ...TYPO.body3,
-    color: PALETTE.medium,
+    color: COLORS.medium,
   },
   segmentTextSelected: {
     ...TYPO.subtitle3,
-    color: PALETTE.white,
-  },
-  iconButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: PALETTE.background,
+    color: COLORS.white,
   },
   disabled: {
-    opacity: 0.4,
+    opacity: OPACITY.disabled,
   },
   sectionTitle: {
     ...TYPO.subtitle1,
@@ -529,17 +465,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
-    paddingHorizontal: 8,
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
   },
   aboutDivider: {
     width: 1,
-    backgroundColor: PALETTE.light,
+    backgroundColor: COLORS.light,
   },
   aboutValues: {
     flex: 1,
     justifyContent: 'center',
-    gap: 4,
+    gap: SPACING.xs,
   },
   aboutValueRow: {
     flexDirection: 'row',
@@ -548,53 +484,21 @@ const styles = StyleSheet.create({
   },
   aboutValue: {
     ...TYPO.body2,
-    color: PALETTE.dark,
+    color: COLORS.dark,
     textAlign: 'center',
   },
   aboutLabel: {
     ...TYPO.caption,
-    color: PALETTE.medium,
+    color: COLORS.medium,
   },
   description: {
     ...TYPO.body2,
-    color: PALETTE.dark,
+    color: COLORS.dark,
   },
   stats: {
-    gap: 8,
-  },
-  messageCard: {
-    backgroundColor: PALETTE.white,
-    borderRadius: 8,
-    padding: 20,
-    gap: 12,
-    alignItems: 'center',
-    alignSelf: 'stretch',
-  },
-  onAccent: {
-    ...TYPO.body2,
-    color: PALETTE.white,
-    textAlign: 'center',
-  },
-  muted: {
-    ...TYPO.body2,
-    color: PALETTE.medium,
-    textAlign: 'center',
-  },
-  error: {
-    ...TYPO.subtitle1,
-    color: PALETTE.dark,
-    textAlign: 'center',
-  },
-  button: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  buttonText: {
-    ...TYPO.subtitle2,
-    color: PALETTE.white,
+    gap: SPACING.sm,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: OPACITY.pressed,
   },
 });

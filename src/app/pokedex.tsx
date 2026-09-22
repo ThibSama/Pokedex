@@ -1,5 +1,4 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,12 +10,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DEFAULT_BATCH_SIZE, fetchPokemonBatch } from '@/api/pokeApi';
 import { useFrameWidth } from '@/components/AppShell';
+import { PrimaryButton, StateView } from '@/components/Controls';
+import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
 import { PokemonCard } from '@/components/PokemonCard';
-import { getTypeColor, PALETTE, POKEDEX_RED } from '@/constants/typeColors';
+import { getTypeColor } from '@/constants/typeColors';
+import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SHADOW, SHELL, SPACING } from '@/theme/tokens';
 import { FONT_FAMILY, TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
 import { GRID_GAP, gridTileWidth } from '@/utils/grid';
@@ -40,25 +41,15 @@ const SORT_ICONS: Record<SortMode, 'sort-numeric-variant' | 'sort-alphabetical-v
 const SORT_MODES = Object.keys(SORT_ICONS) as SortMode[];
 
 /** Figma list frame 1017:431. */
-const HEADER_PADDING = 16;
 const COLUMNS = 3;
-/** White sheet inset from the red shell, per Figma. */
-const SHELL_PADDING = 4;
-const LIST_PADDING = 12;
 
 /** Content box the grid lays out in, inside the red shell and the white sheet. */
 function gridContentWidth(frameWidth: number): number {
-  return frameWidth - 2 * SHELL_PADDING - 2 * LIST_PADDING;
+  return frameWidth - 2 * SHELL.inset - 2 * SHELL.listPadding;
 }
 
-function goBack() {
-  if (router.canGoBack()) router.back();
-  else router.replace('/');
-}
-
-export default function PokedexScreen() {
+export default function PokedexListScreen() {
   const width = useFrameWidth();
-  const insets = useSafeAreaInsets();
 
   // Canonical loaded data, in fetch order. Never sorted/filtered in place.
   const [items, setItems] = useState<PokemonSummary[]>([]);
@@ -124,32 +115,17 @@ export default function PokedexScreen() {
   const isInitialError = status === 'error' && items.length === 0;
 
   return (
-    <View style={styles.screen}>
+    <PokedexScreen>
       {/* One coherent red header area: back, title, search, sort and type filters. */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.titleRow}>
-          <Pressable
-            onPress={goBack}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Revenir à l’écran précédent"
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name="chevron-left" size={28} color={PALETTE.white} />
-          </Pressable>
-          <MaterialCommunityIcons name="pokeball" size={24} color={PALETTE.white} />
-          <Text style={styles.title} accessibilityRole="header">
-            Pokédex
-          </Text>
-        </View>
-
+      <PokedexHeader title="Pokédex" onBack={() => goBack('/')}>
         <View style={styles.controlsRow}>
           <View style={styles.searchField}>
-            <MaterialCommunityIcons name="magnify" size={18} color={POKEDEX_RED} />
+            <MaterialCommunityIcons name="magnify" size={18} color={COLORS.red} />
             <TextInput
               value={options.query}
               onChangeText={(query) => setOptions((o) => ({ ...o, query }))}
               placeholder="Rechercher"
-              placeholderTextColor={PALETTE.medium}
+              placeholderTextColor={COLORS.medium}
               autoCorrect={false}
               autoCapitalize="none"
               clearButtonMode="while-editing"
@@ -176,7 +152,7 @@ export default function PokedexScreen() {
                   <MaterialCommunityIcons
                     name={SORT_ICONS[mode]}
                     size={18}
-                    color={selected ? PALETTE.white : POKEDEX_RED}
+                    color={selected ? COLORS.white : COLORS.red}
                   />
                 </Pressable>
               );
@@ -206,22 +182,20 @@ export default function PokedexScreen() {
             />
           ))}
         </ScrollView>
-      </View>
+      </PokedexHeader>
 
-      <View style={styles.sheet}>
+      <PokedexSurface>
         {isInitialLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator color={POKEDEX_RED} />
-            <Text style={styles.muted}>Chargement des Pokémon…</Text>
-          </View>
+          <StateView>
+            <ActivityIndicator color={COLORS.red} />
+            <Text style={MESSAGE.muted}>Chargement des Pokémon…</Text>
+          </StateView>
         ) : isInitialError ? (
-          <View style={styles.centered}>
-            <Text style={styles.error}>Impossible de charger les Pokémon.</Text>
-            <Text style={styles.muted}>{errorMessage}</Text>
-            <Pressable onPress={retry} style={styles.button} accessibilityRole="button">
-              <Text style={styles.buttonText}>Réessayer</Text>
-            </Pressable>
-          </View>
+          <StateView>
+            <Text style={MESSAGE.error}>Impossible de charger les Pokémon.</Text>
+            <Text style={MESSAGE.muted}>{errorMessage}</Text>
+            <PrimaryButton label="Réessayer" onPress={retry} />
+          </StateView>
         ) : (
           <FlatList
             data={visible}
@@ -235,9 +209,9 @@ export default function PokedexScreen() {
             onEndReachedThreshold={0.5}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
-              <View style={styles.centered}>
-                <Text style={styles.muted}>Aucun Pokémon chargé ne correspond.</Text>
-              </View>
+              <StateView>
+                <Text style={MESSAGE.muted}>Aucun Pokémon chargé ne correspond.</Text>
+              </StateView>
             }
             ListFooterComponent={
               <ListFooter
@@ -251,8 +225,8 @@ export default function PokedexScreen() {
             }
           />
         )}
-      </View>
-    </View>
+      </PokedexSurface>
+    </PokedexScreen>
   );
 }
 
@@ -276,7 +250,7 @@ function FilterChip({
       accessibilityLabel={label === 'Tous' ? 'Afficher tous les types' : `Filtrer par le type ${label}`}
       style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}>
       {color !== null && <View style={[styles.chipDot, { backgroundColor: color }]} />}
-      <Text style={[styles.chipText, selected && { color: color ?? POKEDEX_RED }]}>{label}</Text>
+      <Text style={[styles.chipText, selected && { color: color ?? COLORS.red }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -299,120 +273,83 @@ function ListFooter({
   if (status === 'loadingMore') {
     return (
       <View style={styles.footer}>
-        <ActivityIndicator color={POKEDEX_RED} />
-        <Text style={styles.muted}>Chargement…</Text>
+        <ActivityIndicator color={COLORS.red} />
+        <Text style={MESSAGE.muted}>Chargement…</Text>
       </View>
     );
   }
   if (status === 'error') {
     return (
       <View style={styles.footer}>
-        <Text style={styles.error}>Échec du chargement.</Text>
-        <Text style={styles.muted}>{errorMessage}</Text>
-        <Pressable onPress={onRetry} style={styles.button} accessibilityRole="button">
-          <Text style={styles.buttonText}>Réessayer</Text>
-        </Pressable>
+        <Text style={MESSAGE.error}>Échec du chargement.</Text>
+        <Text style={MESSAGE.muted}>{errorMessage}</Text>
+        <PrimaryButton label="Réessayer" onPress={onRetry} />
       </View>
     );
   }
   if (!hasMore) {
     return (
       <View style={styles.footer}>
-        <Text style={styles.muted}>Fin du Pokédex — {loadedCount} Pokémon chargés.</Text>
+        <Text style={MESSAGE.muted}>Fin du Pokédex — {loadedCount} Pokémon chargés.</Text>
       </View>
     );
   }
   return (
     <View style={styles.footer}>
-      <Text style={styles.muted}>{loadedCount} Pokémon chargés.</Text>
-      <Pressable
+      <Text style={MESSAGE.muted}>{loadedCount} Pokémon chargés.</Text>
+      <PrimaryButton
+        label="Charger plus"
         onPress={onLoadMore}
-        style={styles.button}
-        accessibilityRole="button"
-        accessibilityLabel="Charger plus de Pokémon">
-        <Text style={styles.buttonText}>Charger plus</Text>
-      </Pressable>
+        accessibilityLabel="Charger plus de Pokémon"
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: POKEDEX_RED,
-  },
-  header: {
-    paddingBottom: 12,
-    gap: 12,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: HEADER_PADDING - 8,
-    paddingRight: HEADER_PADDING,
-  },
-  backButton: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    ...TYPO.headline,
-    color: PALETTE.white,
-  },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: HEADER_PADDING,
+    gap: SPACING.sm,
+    paddingHorizontal: SHELL.headerPadding,
   },
   searchField: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SPACING.sm,
     height: 40,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    backgroundColor: PALETTE.white,
-    shadowColor: '#000000',
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    borderRadius: RADIUS.field,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.white,
+    ...SHADOW.float,
   },
   searchInput: {
     flex: 1,
     // Body1 without its 14px line-height, which would clip descenders in a native input.
     fontFamily: FONT_FAMILY.regular,
     fontSize: 14,
-    color: PALETTE.dark,
+    color: COLORS.dark,
   },
   sortGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SPACING.xs,
     height: 40,
-    borderRadius: 20,
-    padding: 4,
-    backgroundColor: PALETTE.white,
-    shadowColor: '#000000',
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    borderRadius: RADIUS.field,
+    padding: SPACING.xs,
+    backgroundColor: COLORS.white,
+    ...SHADOW.float,
   },
   sortButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: RADIUS.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sortButtonSelected: {
-    backgroundColor: POKEDEX_RED,
+    backgroundColor: COLORS.red,
   },
   filtersScroll: {
     flexGrow: 0,
@@ -420,8 +357,8 @@ const styles = StyleSheet.create({
   filters: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: HEADER_PADDING,
+    gap: SPACING.sm,
+    paddingHorizontal: SHELL.headerPadding,
   },
   chip: {
     flexDirection: 'row',
@@ -429,73 +366,37 @@ const styles = StyleSheet.create({
     gap: 6,
     height: 28,
     paddingHorizontal: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: RADIUS.chip,
+    backgroundColor: OVERLAY.fill,
   },
   chipSelected: {
-    backgroundColor: PALETTE.white,
+    backgroundColor: COLORS.white,
   },
   chipDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: RADIUS.pill,
   },
   chipText: {
     ...TYPO.subtitle3,
-    color: PALETTE.white,
+    color: COLORS.white,
     textTransform: 'capitalize',
   },
-  sheet: {
-    flex: 1,
-    backgroundColor: PALETTE.white,
-    marginHorizontal: SHELL_PADDING,
-    marginBottom: SHELL_PADDING,
-    borderRadius: 8,
-    paddingTop: 8,
-  },
   list: {
-    paddingHorizontal: LIST_PADDING,
-    paddingBottom: 16,
+    paddingHorizontal: SHELL.listPadding,
+    paddingBottom: SPACING.lg,
     gap: GRID_GAP,
     flexGrow: 1,
   },
   column: {
     gap: GRID_GAP,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    padding: 24,
-  },
   footer: {
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 16,
-  },
-  muted: {
-    ...TYPO.body2,
-    color: PALETTE.medium,
-    textAlign: 'center',
-  },
-  error: {
-    ...TYPO.subtitle1,
-    color: POKEDEX_RED,
-    textAlign: 'center',
-  },
-  button: {
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: POKEDEX_RED,
-  },
-  buttonText: {
-    ...TYPO.subtitle2,
-    color: PALETTE.white,
+    gap: SPACING.sm,
+    paddingVertical: SPACING.lg,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: OPACITY.pressed,
   },
 });

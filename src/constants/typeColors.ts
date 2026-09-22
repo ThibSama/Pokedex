@@ -20,18 +20,6 @@ export const TYPE_COLORS: Record<string, string> = {
   water: '#6493EB',
 };
 
-/** Neutral palette from the same Figma file. */
-export const PALETTE = {
-  white: '#FFFFFF',
-  background: '#EFEFEF',
-  light: '#E0E0E0',
-  medium: '#666666',
-  dark: '#212121',
-} as const;
-
-/** Pokédex brand red from the Figma list frame; the app's shell color. */
-export const POKEDEX_RED = '#DC0A2D';
-
 export function getTypeColor(type: string | undefined): string {
   return (type && TYPE_COLORS[type]) ?? TYPE_COLORS.normal;
 }

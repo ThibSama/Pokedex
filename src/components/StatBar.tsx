@@ -8,7 +8,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { PALETTE, withAlpha } from '@/constants/typeColors';
+import { withAlpha } from '@/constants/typeColors';
+import { COLORS } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 
 /** Maximum base stat in the main series; bars are scaled against it. */
@@ -68,12 +69,12 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 16,
-    backgroundColor: PALETTE.light,
+    backgroundColor: COLORS.light,
   },
   value: {
     ...TYPO.body3,
     width: 24,
-    color: PALETTE.dark,
+    color: COLORS.dark,
     fontVariant: ['tabular-nums'],
   },
   track: {

@@ -1,6 +1,7 @@
 import { StyleSheet, Text } from 'react-native';
 
-import { getTypeColor, PALETTE } from '@/constants/typeColors';
+import { getTypeColor } from '@/constants/typeColors';
+import { COLORS, RADIUS } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 
 interface TypeBadgeProps {
@@ -14,11 +15,12 @@ export function TypeBadge({ type }: TypeBadgeProps) {
 const styles = StyleSheet.create({
   badge: {
     ...TYPO.subtitle3,
-    color: PALETTE.white,
+    color: COLORS.white,
     textTransform: 'capitalize',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 10,
+    // The badge is 20px tall, so the pill radius is what it always rendered as.
+    borderRadius: RADIUS.pill,
     overflow: 'hidden',
   },
 });
