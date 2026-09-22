@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { fetchPokemonDetails, isSupportedDexId, NATIONAL_DEX_MAX, NATIONAL_DEX_MIN } from '@/api/pokeApi';
+import { CryButton } from '@/components/CryButton';
 import { StatBar } from '@/components/StatBar';
 import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor, PALETTE } from '@/constants/typeColors';
@@ -171,6 +172,8 @@ export default function PokemonDetailScreen() {
             <View style={styles.toggleGap} />
             <Toggle label="FR" selected={language === 'fr'} onPress={() => setLanguage('fr')} accent={accent} />
             <Toggle label="EN" selected={language === 'en'} onPress={() => setLanguage('en')} accent={accent} />
+            <View style={styles.toggleGap} />
+            <CryButton apiName={details.apiName} accent={accent} />
           </View>
 
           <Text style={[styles.sectionTitle, { color: accent }]}>About</Text>
