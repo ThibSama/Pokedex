@@ -1,8 +1,10 @@
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { PALETTE } from '@/constants/typeColors';
+import { TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
 import { formatDexNumber } from '@/utils/pokemonList';
 
@@ -22,16 +24,26 @@ function accessibilityLabelFor(pokemon: PokemonSummary): string {
 }
 
 export function PokemonCard({ pokemon, variant = 'row', width }: PokemonCardProps) {
+  // `Link asChild` hands the child to Radix's Slot, which merges styles with
+  // `{ ...slotStyle, ...childStyle }`. Spreading a style *function* — or an
+  // array — into an object silently yields `{}`, dropping every style including
+  // the computed grid width. So press state is tracked here and the result is
+  // flattened into the single plain object Slot can actually merge.
+  const [pressed, setPressed] = useState(false);
+  const style = StyleSheet.flatten<ViewStyle>([
+    variant === 'grid' ? [styles.tile, width !== undefined && { width }] : styles.card,
+    pressed && styles.pressed,
+  ]);
+
   return (
     <Link href={{ pathname: '/pokemon/[id]', params: { id: pokemon.id } }} asChild>
       <Pressable
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabelFor(pokemon)}
         accessibilityHint="Ouvre la fiche détaillée du Pokémon"
-        style={({ pressed }) => [
-          variant === 'grid' ? [styles.tile, width !== undefined && { width }] : styles.card,
-          pressed && styles.pressed,
-        ]}
+        style={style}
       >
         {variant === 'grid' ? (
           <>
@@ -63,6 +75,10 @@ export function PokemonCard({ pokemon, variant = 'row', width }: PokemonCardProp
     </Link>
   );
 }
+
+const TILE_PADDING_TOP = 2;
+/** Figma artwork box inside a Pokédex tile. */
+const TILE_ARTWORK_SIZE = 72;
 
 const styles = StyleSheet.create({
   card: {
@@ -107,10 +123,14 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 999,
   },
+  /**
+   * Figma tile: 104x108 at a 360px frame. The height is composed rather than
+   * fixed — 2 (padding) + 12 (Dex number) + 72 (artwork) + 22 (name band).
+   */
   tile: {
     backgroundColor: PALETTE.white,
     borderRadius: 8,
-    paddingTop: 4,
+    paddingTop: TILE_PADDING_TOP,
     alignItems: 'center',
     overflow: 'hidden',
     // Figma card elevation; `elevation` is Android-only and ignored elsewhere.
@@ -121,29 +141,26 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tileDexNumber: {
+    ...TYPO.caption,
     alignSelf: 'flex-end',
-    fontSize: 10,
     color: PALETTE.medium,
     fontVariant: ['tabular-nums'],
     paddingRight: 8,
   },
   tileArtwork: {
     width: '100%',
-    height: 72,
-    marginTop: -4,
+    height: TILE_ARTWORK_SIZE,
   },
   tileFooter: {
     width: '100%',
-    marginTop: 4,
     backgroundColor: PALETTE.background,
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
-    paddingVertical: 6,
+    paddingVertical: 3,
     paddingHorizontal: 4,
   },
   tileName: {
-    fontSize: 11,
-    fontWeight: '500',
+    ...TYPO.body3,
     color: PALETTE.dark,
     textAlign: 'center',
   },

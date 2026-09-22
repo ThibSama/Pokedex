@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { PALETTE, withAlpha } from '@/constants/typeColors';
+import { TYPO } from '@/theme/typography';
 
 /** Maximum base stat in the main series; bars are scaled against it. */
 export const MAX_BASE_STAT = 255;
@@ -60,9 +61,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
+    ...TYPO.subtitle3,
     width: 32,
-    fontSize: 10,
-    fontWeight: '700',
     textAlign: 'right',
   },
   divider: {
@@ -71,8 +71,8 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.light,
   },
   value: {
+    ...TYPO.body3,
     width: 24,
-    fontSize: 10,
     color: PALETTE.dark,
     fontVariant: ['tabular-nums'],
   },

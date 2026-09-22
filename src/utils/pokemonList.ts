@@ -16,6 +16,15 @@ export function formatDexNumber(id: number): string {
   return `#${String(id).padStart(3, '0')}`;
 }
 
+/** `inner-focus` → `Inner Focus`, so API slugs never reach the UI verbatim. */
+export function humanizeSlug(slug: string): string {
+  return slug
+    .split('-')
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 /** Lowercase and strip diacritics so "evoli" matches "Évoli". */
 function normalizeText(value: string): string {
   return value

@@ -1,6 +1,7 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { getPokemonCryUrl } from '@/api/pokemonAudio';
 import { PALETTE } from '@/constants/typeColors';
@@ -19,6 +20,9 @@ interface CryButtonProps {
  * Plays the current Pokémon's cry from Pokémon Showdown. The player source
  * depends only on `apiName`, so Normal/Shiny and FR/EN re-renders neither
  * reload the audio nor trigger any network request for detail data.
+ *
+ * Rendered as a round icon button so it sits in the detail screen's secondary
+ * action row without competing with the Figma hierarchy.
  */
 export function CryButton({ apiName, accent }: CryButtonProps) {
   const url = getPokemonCryUrl(apiName);
@@ -36,6 +40,7 @@ export function CryButton({ apiName, accent }: CryButtonProps) {
   }, []);
 
   const unavailable = url === null || failedFor === apiName || status.error !== null;
+  const disabled = unavailable || !status.isLoaded;
 
   async function playCry() {
     try {
@@ -47,38 +52,38 @@ export function CryButton({ apiName, accent }: CryButtonProps) {
     }
   }
 
-  const label = unavailable ? 'Cri indisponible' : status.playing ? '▶ Cri…' : '▶ Cri';
-
   return (
     <Pressable
       onPress={playCry}
-      disabled={unavailable || !status.isLoaded}
-      hitSlop={6}
+      disabled={disabled}
+      hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={unavailable ? `Cri de ${apiName} indisponible` : `Écouter le cri de ${apiName}`}
-      accessibilityState={{ disabled: unavailable || !status.isLoaded, busy: status.playing }}
+      accessibilityState={{ disabled, busy: status.playing }}
       style={[
         styles.button,
-        { backgroundColor: accent },
-        (unavailable || !status.isLoaded) && styles.buttonDisabled,
+        status.playing && { backgroundColor: accent },
+        disabled && styles.buttonDisabled,
       ]}>
-      <Text style={styles.text}>{label}</Text>
+      <MaterialCommunityIcons
+        name={unavailable ? 'volume-off' : 'volume-high'}
+        size={16}
+        color={status.playing ? PALETTE.white : accent}
+      />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PALETTE.background,
   },
   buttonDisabled: {
     opacity: 0.4,
-  },
-  text: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: PALETTE.white,
   },
 });

@@ -95,7 +95,7 @@ export default function CollectionScreen() {
       <View style={styles.centered}>
         <Text style={styles.title}>Collection vide</Text>
         <Text style={styles.muted}>
-          Ouvrez un Pokémon dans le Pokédex et touchez « ☆ Collection » pour l’ajouter ici.
+          Ouvrez un Pokémon dans le Pokédex et touchez le cœur pour l’ajouter ici.
         </Text>
       </View>
     );

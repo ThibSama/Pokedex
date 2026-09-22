@@ -1,7 +1,9 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchPokemonDetails, isSupportedDexId, NATIONAL_DEX_MAX, NATIONAL_DEX_MIN } from '@/api/pokeApi';
 import { CryButton } from '@/components/CryButton';
@@ -9,8 +11,9 @@ import { StatBar } from '@/components/StatBar';
 import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor, PALETTE } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
+import { TYPO } from '@/theme/typography';
 import type { LanguageCode, PokemonDetails, PokemonStats } from '@/types/pokemon';
-import { formatDexNumber } from '@/utils/pokemonList';
+import { formatDexNumber, humanizeSlug } from '@/utils/pokemonList';
 
 type LoadState =
   | { status: 'loading' }
@@ -30,6 +33,11 @@ const STAT_ROWS: { key: keyof PokemonStats; label: string }[] = [
 ];
 const STAT_STAGGER_MS = 80;
 
+const ARTWORK_SIZE = 200;
+const ARTWORK_OVERLAP = 60;
+/** Figma hero watermark: an oversized, barely-there Pokéball behind the artwork. */
+const WATERMARK_SIZE = 208;
+
 /** Parse the route param into a supported Dex id, or null when invalid. */
 function parseDexId(param: string | string[] | undefined): number | null {
   const raw = Array.isArray(param) ? param[0] : param;
@@ -40,6 +48,16 @@ function parseDexId(param: string | string[] | undefined): number | null {
 
 function formatMetric(value: number, unit: string) {
   return `${value.toFixed(1).replace('.', ',')} ${unit}`;
+}
+
+function goBack() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/pokedex');
+}
+
+/** Swap the current entry rather than stacking one screen per neighbour visited. */
+function goToDexId(id: number) {
+  router.replace({ pathname: '/pokemon/[id]', params: { id } });
 }
 
 export default function PokemonDetailScreen() {
@@ -77,50 +95,46 @@ export default function PokemonDetailScreen() {
   }
 
   const accent = state.status === 'success' ? getTypeColor(state.details.types[0]) : PALETTE.medium;
-  const headerOptions = {
-    headerStyle: { backgroundColor: accent },
-    headerTintColor: PALETTE.white,
-    headerShadowVisible: false,
-    headerTitleStyle: { color: PALETTE.white, fontSize: 24, fontWeight: '700' as const },
-    headerBackButtonDisplayMode: 'minimal' as const,
-  };
 
   if (id === null) {
     return (
-      <View style={[styles.centered, { backgroundColor: accent }]}>
-        <Stack.Screen options={{ ...headerOptions, title: 'Pokémon' }} />
-        <View style={styles.messageCard}>
-          <Text style={styles.error}>Identifiant invalide.</Text>
-          <Text style={styles.muted}>
-            « {String(idParam)} » n’est pas un numéro du Pokédex national ({NATIONAL_DEX_MIN}–{NATIONAL_DEX_MAX}).
-          </Text>
+      <Shell accent={accent} title="Pokémon">
+        <View style={styles.centered}>
+          <View style={styles.messageCard}>
+            <Text style={styles.error}>Identifiant invalide.</Text>
+            <Text style={styles.muted}>
+              « {String(idParam)} » n’est pas un numéro du Pokédex national ({NATIONAL_DEX_MIN}–{NATIONAL_DEX_MAX}).
+            </Text>
+          </View>
         </View>
-      </View>
+      </Shell>
     );
   }
 
   if (state.status === 'loading') {
     return (
-      <View style={[styles.centered, { backgroundColor: accent }]}>
-        <Stack.Screen options={{ ...headerOptions, title: formatDexNumber(id) }} />
-        <ActivityIndicator color={PALETTE.white} />
-        <Text style={styles.onAccent}>Chargement de {formatDexNumber(id)}…</Text>
-      </View>
+      <Shell accent={accent} title="Pokémon" dexNumber={formatDexNumber(id)}>
+        <View style={styles.centered}>
+          <ActivityIndicator color={PALETTE.white} />
+          <Text style={styles.onAccent}>Chargement de {formatDexNumber(id)}…</Text>
+        </View>
+      </Shell>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <View style={[styles.centered, { backgroundColor: accent }]}>
-        <Stack.Screen options={{ ...headerOptions, title: formatDexNumber(id) }} />
-        <View style={styles.messageCard}>
-          <Text style={styles.error}>Impossible de charger {formatDexNumber(id)}.</Text>
-          <Text style={styles.muted}>{state.message}</Text>
-          <Pressable onPress={retry} style={[styles.button, { backgroundColor: accent }]}>
-            <Text style={styles.buttonText}>Réessayer</Text>
-          </Pressable>
+      <Shell accent={accent} title="Pokémon" dexNumber={formatDexNumber(id)}>
+        <View style={styles.centered}>
+          <View style={styles.messageCard}>
+            <Text style={styles.error}>Impossible de charger {formatDexNumber(id)}.</Text>
+            <Text style={styles.muted}>{state.message}</Text>
+            <Pressable onPress={retry} style={[styles.button, { backgroundColor: accent }]}>
+              <Text style={styles.buttonText}>Réessayer</Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </Shell>
     );
   }
 
@@ -131,17 +145,11 @@ export default function PokemonDetailScreen() {
   const favorite = isFavorite(details.id);
 
   return (
-    <View style={[styles.screen, { backgroundColor: accent }]}>
-      <Stack.Screen
-        options={{
-          ...headerOptions,
-          title: name,
-          headerRight: () => <Text style={styles.headerDexNumber}>{formatDexNumber(details.id)}</Text>,
-        }}
-      />
+    <Shell accent={accent} title={name} dexNumber={formatDexNumber(details.id)}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Artwork overlaps the card, as in the Figma. */}
-        <View style={styles.artworkSlot}>
+        {/* Artwork overlaps the card, flanked by the Figma navigation chevrons. */}
+        <View style={styles.heroRow}>
+          <HeroChevron direction="previous" currentId={details.id} />
           {spriteUrl ? (
             <Image
               source={spriteUrl}
@@ -154,6 +162,7 @@ export default function PokemonDetailScreen() {
               <Text style={styles.onAccent}>Aucune image</Text>
             </View>
           )}
+          <HeroChevron direction="next" currentId={details.id} />
         </View>
 
         <View style={styles.card}>
@@ -163,52 +172,62 @@ export default function PokemonDetailScreen() {
             ))}
           </View>
 
-          {/* Compact local toggles; they only index into already-loaded data. */}
-          <View style={styles.toggles}>
-            <Toggle label="Normal" selected={variant === 'normal'} onPress={() => setVariant('normal')} accent={accent} />
-            <Toggle
-              label="Shiny"
-              selected={variant === 'shiny'}
-              disabled={!shinyAvailable}
-              onPress={() => setVariant('shiny')}
+          {/* Secondary actions: compact, and purely local to already-loaded data. */}
+          <View style={styles.actions}>
+            <Segmented
               accent={accent}
+              accessibilityLabel="Apparence"
+              options={[
+                { key: 'normal', label: 'Normal' },
+                { key: 'shiny', label: 'Shiny', disabled: !shinyAvailable },
+              ]}
+              value={variant}
+              onChange={setVariant}
             />
-            <View style={styles.toggleGap} />
-            <Toggle label="FR" selected={language === 'fr'} onPress={() => setLanguage('fr')} accent={accent} />
-            <Toggle label="EN" selected={language === 'en'} onPress={() => setLanguage('en')} accent={accent} />
-            <View style={styles.toggleGap} />
+            <Segmented
+              accent={accent}
+              accessibilityLabel="Langue du nom"
+              options={[
+                { key: 'fr', label: 'FR' },
+                { key: 'en', label: 'EN' },
+              ]}
+              value={language}
+              onChange={setLanguage}
+            />
             <CryButton apiName={details.apiName} accent={accent} />
             <Pressable
               onPress={() => toggleFavorite(details.id)}
               disabled={!hydrated}
-              hitSlop={6}
+              hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={
-                favorite
-                  ? `Retirer ${name} de la collection`
-                  : `Ajouter ${name} à la collection`
+                favorite ? `Retirer ${name} de la collection` : `Ajouter ${name} à la collection`
               }
               accessibilityState={{ disabled: !hydrated, selected: favorite }}
               style={[
-                styles.favorite,
-                favorite && { backgroundColor: accent, borderColor: accent },
-                !hydrated && styles.toggleDisabled,
+                styles.iconButton,
+                favorite && { backgroundColor: accent },
+                !hydrated && styles.disabled,
               ]}>
-              <Text style={[styles.favoriteText, favorite && styles.toggleTextSelected]}>
-                {favorite ? '★ Collection' : '☆ Collection'}
-              </Text>
+              <MaterialCommunityIcons
+                name={favorite ? 'heart' : 'heart-outline'}
+                size={16}
+                color={favorite ? PALETTE.white : accent}
+              />
             </Pressable>
           </View>
 
           <Text style={[styles.sectionTitle, { color: accent }]}>About</Text>
           <View style={styles.about}>
-            <AboutColumn label="Weight" lines={[formatMetric(details.weightKg, 'kg')]} />
+            <AboutColumn label="Poids" icon="weight-kilogram" lines={[formatMetric(details.weightKg, 'kg')]} />
             <View style={styles.aboutDivider} />
-            <AboutColumn label="Height" lines={[formatMetric(details.heightM, 'm')]} />
+            <AboutColumn label="Taille" icon="ruler" lines={[formatMetric(details.heightM, 'm')]} />
             <View style={styles.aboutDivider} />
             <AboutColumn
-              label="Moves"
-              lines={details.abilities.map((a) => (a.isHidden ? `${a.name} (hidden)` : a.name))}
+              label="Talents"
+              lines={details.abilities.map((ability) =>
+                ability.isHidden ? `${humanizeSlug(ability.name)} (caché)` : humanizeSlug(ability.name),
+              )}
             />
           </View>
 
@@ -228,42 +247,133 @@ export default function PokemonDetailScreen() {
           </View>
         </View>
       </ScrollView>
+    </Shell>
+  );
+}
+
+/**
+ * The accent-colored frame shared by every state: Pokéball watermark, custom
+ * title row (back / name / #NNN) and the accent background itself.
+ */
+function Shell({
+  accent,
+  title,
+  dexNumber,
+  children,
+}: {
+  accent: string;
+  title: string;
+  dexNumber?: string;
+  children: ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.screen, { backgroundColor: accent }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={[styles.watermark, { top: insets.top - 16 }]} pointerEvents="none">
+        <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color="rgba(255, 255, 255, 0.12)" />
+      </View>
+      <View style={[styles.titleRow, { paddingTop: insets.top + 8 }]}>
+        <Pressable
+          onPress={goBack}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Revenir à l’écran précédent"
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color={PALETTE.white} />
+        </Pressable>
+        <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
+          {title}
+        </Text>
+        {dexNumber !== undefined && <Text style={styles.dexNumber}>{dexNumber}</Text>}
+      </View>
+      {children}
     </View>
   );
 }
 
-function Toggle({
-  label,
-  selected,
-  disabled = false,
-  accent,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  disabled?: boolean;
-  accent: string;
-  onPress: () => void;
-}) {
+/**
+ * Previous/next chevron around the hero. Rendered as an invisible spacer at the
+ * Dex boundaries so the artwork stays centered.
+ */
+function HeroChevron({ direction, currentId }: { direction: 'previous' | 'next'; currentId: number }) {
+  const targetId = direction === 'previous' ? currentId - 1 : currentId + 1;
+  if (!isSupportedDexId(targetId)) return <View style={styles.chevron} />;
   return (
     <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      hitSlop={6}
-      style={[styles.toggle, selected && { backgroundColor: accent }, disabled && styles.toggleDisabled]}>
-      <Text style={[styles.toggleText, selected && styles.toggleTextSelected]}>{label}</Text>
+      onPress={() => goToDexId(targetId)}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={
+        direction === 'previous'
+          ? `Pokémon précédent, ${formatDexNumber(targetId)}`
+          : `Pokémon suivant, ${formatDexNumber(targetId)}`
+      }
+      style={({ pressed }) => [styles.chevron, pressed && styles.pressed]}>
+      <MaterialCommunityIcons
+        name={direction === 'previous' ? 'chevron-left' : 'chevron-right'}
+        size={32}
+        color={PALETTE.white}
+      />
     </Pressable>
   );
 }
 
-function AboutColumn({ label, lines }: { label: string; lines: string[] }) {
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  accent,
+  accessibilityLabel,
+}: {
+  options: { key: T; label: string; disabled?: boolean }[];
+  value: T;
+  onChange: (next: T) => void;
+  accent: string;
+  accessibilityLabel: string;
+}) {
+  return (
+    <View style={styles.segmented} accessibilityRole="radiogroup" accessibilityLabel={accessibilityLabel}>
+      {options.map((option) => {
+        const selected = option.key === value;
+        return (
+          <Pressable
+            key={option.key}
+            onPress={() => onChange(option.key)}
+            disabled={option.disabled}
+            accessibilityRole="button"
+            accessibilityState={{ selected, disabled: option.disabled ?? false }}
+            accessibilityLabel={`${accessibilityLabel} : ${option.label}`}
+            style={[
+              styles.segment,
+              selected && { backgroundColor: accent },
+              option.disabled && styles.disabled,
+            ]}>
+            <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function AboutColumn({
+  label,
+  icon,
+  lines,
+}: {
+  label: string;
+  icon?: 'weight-kilogram' | 'ruler';
+  lines: string[];
+}) {
   return (
     <View style={styles.aboutColumn}>
       <View style={styles.aboutValues}>
         {lines.map((line) => (
-          <Text key={line} style={styles.aboutValue}>
-            {line}
-          </Text>
+          <View key={line} style={styles.aboutValueRow}>
+            {icon !== undefined && <MaterialCommunityIcons name={icon} size={14} color={PALETTE.dark} />}
+            <Text style={styles.aboutValue}>{line}</Text>
+          </View>
         ))}
       </View>
       <Text style={styles.aboutLabel}>{label}</Text>
@@ -271,12 +381,37 @@ function AboutColumn({ label, lines }: { label: string; lines: string[] }) {
   );
 }
 
-const ARTWORK_SIZE = 200;
-const ARTWORK_OVERLAP = 60;
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+  },
+  watermark: {
+    position: 'absolute',
+    right: -16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 8,
+    paddingRight: 20,
+    paddingBottom: 4,
+  },
+  backButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    ...TYPO.headline,
+    flex: 1,
+    color: PALETTE.white,
+  },
+  dexNumber: {
+    ...TYPO.subtitle2,
+    color: PALETTE.white,
+    fontVariant: ['tabular-nums'],
   },
   centered: {
     flex: 1,
@@ -285,15 +420,25 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 24,
   },
+  // `flexGrow` (not `flex`) so the card fills a short viewport but still grows with content.
   content: {
+    flexGrow: 1,
     paddingHorizontal: 4,
     paddingBottom: 4,
   },
-  artworkSlot: {
+  heroRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
     marginBottom: -ARTWORK_OVERLAP,
     zIndex: 1,
+  },
+  chevron: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   artwork: {
     width: ARTWORK_SIZE,
@@ -304,66 +449,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
+    flexGrow: 1,
     backgroundColor: PALETTE.white,
     borderRadius: 8,
     paddingTop: ARTWORK_OVERLAP + 8,
     paddingHorizontal: 20,
     paddingBottom: 20,
     gap: 16,
-    minHeight: 480,
-  },
-  headerDexNumber: {
-    color: PALETTE.white,
-    fontSize: 12,
-    fontWeight: '700',
-    marginRight: 20,
   },
   types: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 16,
   },
-  toggles: {
+  actions: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  toggleGap: {
-    width: 12,
-  },
-  toggle: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+  segmented: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    padding: 2,
+    borderRadius: 16,
     backgroundColor: PALETTE.background,
   },
-  toggleDisabled: {
+  segment: {
+    height: 24,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  segmentText: {
+    ...TYPO.body3,
+    color: PALETTE.medium,
+  },
+  segmentTextSelected: {
+    ...TYPO.subtitle3,
+    color: PALETTE.white,
+  },
+  iconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PALETTE.background,
+  },
+  disabled: {
     opacity: 0.4,
   },
-  favorite: {
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: PALETTE.light,
-  },
-  favoriteText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: PALETTE.medium,
-  },
-  toggleText: {
-    fontSize: 10,
-    color: PALETTE.medium,
-  },
-  toggleTextSelected: {
-    color: PALETTE.white,
-    fontWeight: '700',
-  },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...TYPO.subtitle1,
     textAlign: 'center',
   },
   about: {
@@ -386,19 +525,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
+  aboutValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   aboutValue: {
-    fontSize: 12,
+    ...TYPO.body2,
     color: PALETTE.dark,
     textAlign: 'center',
-    textTransform: 'capitalize',
   },
   aboutLabel: {
-    fontSize: 10,
+    ...TYPO.caption,
     color: PALETTE.medium,
   },
   description: {
-    fontSize: 12,
-    lineHeight: 16,
+    ...TYPO.body2,
     color: PALETTE.dark,
   },
   stats: {
@@ -413,18 +555,17 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   onAccent: {
+    ...TYPO.body2,
     color: PALETTE.white,
-    fontSize: 12,
     textAlign: 'center',
   },
   muted: {
-    fontSize: 12,
+    ...TYPO.body2,
     color: PALETTE.medium,
     textAlign: 'center',
   },
   error: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...TYPO.subtitle1,
     color: PALETTE.dark,
     textAlign: 'center',
   },
@@ -434,8 +575,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
+    ...TYPO.subtitle2,
     color: PALETTE.white,
-    fontWeight: '700',
-    fontSize: 12,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

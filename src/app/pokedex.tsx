@@ -1,4 +1,5 @@
-import { Stack } from 'expo-router';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,10 +12,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DEFAULT_BATCH_SIZE, fetchPokemonBatch } from '@/api/pokeApi';
 import { PokemonCard } from '@/components/PokemonCard';
 import { getTypeColor, PALETTE } from '@/constants/typeColors';
+import { FONT_FAMILY, TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
 import {
   DEFAULT_LIST_OPTIONS,
@@ -27,26 +30,41 @@ import {
 
 type LoadStatus = 'loading' | 'loadingMore' | 'idle' | 'error';
 
-const SORT_LABELS: Record<SortMode, string> = { dex: 'N° Dex', name: 'Nom' };
+const SORT_LABELS: Record<SortMode, string> = { dex: 'numéro du Pokédex', name: 'nom' };
+/** Icon-only sort control: the glyph itself says which order is active. */
+const SORT_ICONS: Record<SortMode, 'sort-numeric-variant' | 'sort-alphabetical-variant'> = {
+  dex: 'sort-numeric-variant',
+  name: 'sort-alphabetical-variant',
+};
+const SORT_MODES = Object.keys(SORT_ICONS) as SortMode[];
 
-/** Figma list frame 1024:1850. */
+/** Figma list frame 1017:431. */
 const POKEDEX_RED = '#DC0A2D';
+const HEADER_PADDING = 16;
 const COLUMNS = 3;
-const SHELL_PADDING = 8;
+/** White sheet inset from the red shell, per Figma. */
+const SHELL_PADDING = 4;
 const LIST_PADDING = 12;
 const GRID_GAP = 8;
 
 /**
- * Tile width that always fits 3 columns, derived from the window rather than the
- * 360px Figma frame. The floor only guards against a degenerate window width.
+ * Tile width for exactly `COLUMNS` columns across the grid's content box.
+ * Fractional on purpose: rounding down leaves unused white space on the right.
+ * 360px → 104, 393px → 115.
  */
 function tileWidth(windowWidth: number): number {
-  const available = windowWidth - 2 * SHELL_PADDING - 2 * LIST_PADDING - (COLUMNS - 1) * GRID_GAP;
-  return Math.max(48, Math.floor(available / COLUMNS));
+  const content = windowWidth - 2 * SHELL_PADDING - 2 * LIST_PADDING;
+  return Math.max(48, (content - (COLUMNS - 1) * GRID_GAP) / COLUMNS);
+}
+
+function goBack() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
 }
 
 export default function PokedexScreen() {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   // Canonical loaded data, in fetch order. Never sorted/filtered in place.
   const [items, setItems] = useState<PokemonSummary[]>([]);
@@ -113,35 +131,41 @@ export default function PokedexScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* The screen paints its own red header area, so the native bar only keeps the back affordance. */}
-      <Stack.Screen
-        options={{
-          headerTitle: '',
-          headerStyle: { backgroundColor: POKEDEX_RED },
-          headerTintColor: PALETTE.white,
-          headerShadowVisible: false,
-        }}
-      />
+      {/* One coherent red header area: back, title, search, sort and type filters. */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <View style={styles.titleRow}>
+          <Pressable
+            onPress={goBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Revenir à l’écran précédent"
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+            <MaterialCommunityIcons name="chevron-left" size={28} color={PALETTE.white} />
+          </Pressable>
+          <MaterialCommunityIcons name="pokeball" size={24} color={PALETTE.white} />
+          <Text style={styles.title} accessibilityRole="header">
+            Pokédex
+          </Text>
+        </View>
 
-      <View style={styles.header}>
-        <Text style={styles.title} accessibilityRole="header">
-          Pokédex
-        </Text>
         <View style={styles.controlsRow}>
-          <TextInput
-            value={options.query}
-            onChangeText={(query) => setOptions((o) => ({ ...o, query }))}
-            placeholder="Rechercher"
-            placeholderTextColor={PALETTE.medium}
-            autoCorrect={false}
-            autoCapitalize="none"
-            clearButtonMode="while-editing"
-            style={styles.search}
-            accessibilityLabel="Rechercher un Pokémon parmi ceux déjà chargés"
-            accessibilityHint="Filtre la liste par nom français, nom anglais ou numéro du Pokédex"
-          />
+          <View style={styles.searchField}>
+            <MaterialCommunityIcons name="magnify" size={18} color={POKEDEX_RED} />
+            <TextInput
+              value={options.query}
+              onChangeText={(query) => setOptions((o) => ({ ...o, query }))}
+              placeholder="Rechercher"
+              placeholderTextColor={PALETTE.medium}
+              autoCorrect={false}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+              style={styles.searchInput}
+              accessibilityLabel="Rechercher un Pokémon parmi ceux déjà chargés"
+              accessibilityHint="Filtre la liste par nom français, nom anglais ou numéro du Pokédex"
+            />
+          </View>
           <View style={styles.sortGroup} accessibilityRole="radiogroup">
-            {(Object.keys(SORT_LABELS) as SortMode[]).map((mode) => {
+            {SORT_MODES.map((mode) => {
               const selected = options.sort === mode;
               return (
                 <Pressable
@@ -154,28 +178,27 @@ export default function PokedexScreen() {
                     styles.sortButton,
                     selected && styles.sortButtonSelected,
                     pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={[styles.sortText, selected && styles.sortTextSelected]}>
-                    {SORT_LABELS[mode]}
-                  </Text>
+                  ]}>
+                  <MaterialCommunityIcons
+                    name={SORT_ICONS[mode]}
+                    size={18}
+                    color={selected ? PALETTE.white : POKEDEX_RED}
+                  />
                 </Pressable>
               );
             })}
           </View>
         </View>
-      </View>
 
-      <View style={styles.sheet}>
+        {/* Type filtering rides in the header so it never squeezes the grid. */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filters}
-          style={styles.filtersScroll}
-        >
+          style={styles.filtersScroll}>
           <FilterChip
             label="Tous"
-            color={PALETTE.medium}
+            color={null}
             selected={options.type === null}
             onPress={() => setOptions((o) => ({ ...o, type: null }))}
           />
@@ -189,7 +212,9 @@ export default function PokedexScreen() {
             />
           ))}
         </ScrollView>
+      </View>
 
+      <View style={styles.sheet}>
         {isInitialLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator color={POKEDEX_RED} />
@@ -244,7 +269,8 @@ function FilterChip({
   onPress,
 }: {
   label: string;
-  color: string;
+  /** Type accent, or null for the catch-all chip, which shows no dot. */
+  color: string | null;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -254,13 +280,9 @@ function FilterChip({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={label === 'Tous' ? 'Afficher tous les types' : `Filtrer par le type ${label}`}
-      style={({ pressed }) => [
-        styles.chip,
-        selected && { backgroundColor: color, borderColor: color },
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}>
+      {color !== null && <View style={[styles.chipDot, { backgroundColor: color }]} />}
+      <Text style={[styles.chipText, selected && { color: color ?? POKEDEX_RED }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -313,8 +335,7 @@ function ListFooter({
         onPress={onLoadMore}
         style={styles.button}
         accessibilityRole="button"
-        accessibilityLabel="Charger plus de Pokémon"
-      >
+        accessibilityLabel="Charger plus de Pokémon">
         <Text style={styles.buttonText}>Charger plus</Text>
       </Pressable>
     </View>
@@ -327,87 +348,116 @@ const styles = StyleSheet.create({
     backgroundColor: POKEDEX_RED,
   },
   header: {
-    paddingHorizontal: SHELL_PADDING + 8,
     paddingBottom: 12,
     gap: 12,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: HEADER_PADDING - 8,
+    paddingRight: HEADER_PADDING,
+  },
+  backButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
+    ...TYPO.headline,
     color: PALETTE.white,
-    fontSize: 24,
-    fontWeight: '700',
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: HEADER_PADDING,
   },
-  search: {
+  searchField: {
     flex: 1,
-    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 40,
+    borderRadius: 20,
+    paddingHorizontal: 12,
     backgroundColor: PALETTE.white,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 15,
+    shadowColor: '#000000',
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    // Body1 without its 14px line-height, which would clip descenders in a native input.
+    fontFamily: FONT_FAMILY.regular,
+    fontSize: 14,
     color: PALETTE.dark,
   },
   sortGroup: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 40,
+    borderRadius: 20,
+    padding: 4,
     backgroundColor: PALETTE.white,
-    borderRadius: 16,
-    padding: 2,
+    shadowColor: '#000000',
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
   },
   sortButton: {
-    minHeight: 40,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    borderRadius: 14,
   },
   sortButtonSelected: {
     backgroundColor: POKEDEX_RED,
-  },
-  sortText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: POKEDEX_RED,
-  },
-  sortTextSelected: {
-    color: PALETTE.white,
-  },
-  sheet: {
-    flex: 1,
-    backgroundColor: PALETTE.white,
-    marginHorizontal: SHELL_PADDING,
-    marginBottom: SHELL_PADDING,
-    borderRadius: 12,
-    paddingTop: 8,
   },
   filtersScroll: {
     flexGrow: 0,
   },
   filters: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-    paddingHorizontal: LIST_PADDING,
-    paddingBottom: 8,
+    paddingHorizontal: HEADER_PADDING,
   },
   chip: {
-    minHeight: 32,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: PALETTE.light,
-    backgroundColor: PALETTE.background,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  chipSelected: {
+    backgroundColor: PALETTE.white,
+  },
+  chipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   chipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: PALETTE.medium,
+    ...TYPO.subtitle3,
+    color: PALETTE.white,
     textTransform: 'capitalize',
   },
-  chipTextSelected: {
-    color: PALETTE.white,
+  sheet: {
+    flex: 1,
+    backgroundColor: PALETTE.white,
+    marginHorizontal: SHELL_PADDING,
+    marginBottom: SHELL_PADDING,
+    borderRadius: 8,
+    paddingTop: 8,
   },
   list: {
     paddingHorizontal: LIST_PADDING,
@@ -431,25 +481,25 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   muted: {
-    fontSize: 14,
+    ...TYPO.body2,
     color: PALETTE.medium,
     textAlign: 'center',
   },
   error: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...TYPO.subtitle1,
     color: POKEDEX_RED,
+    textAlign: 'center',
   },
   button: {
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: 'center',
     paddingHorizontal: 16,
     borderRadius: 999,
     backgroundColor: POKEDEX_RED,
   },
   buttonText: {
+    ...TYPO.subtitle2,
     color: PALETTE.white,
-    fontWeight: '700',
   },
   pressed: {
     opacity: 0.7,
