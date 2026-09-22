@@ -35,3 +35,36 @@ export interface PokemonBatch {
   total: number;
   hasMore: boolean;
 }
+
+export type LanguageCode = 'fr' | 'en';
+
+/** Six base stats, keyed explicitly (never by PokéAPI array position). */
+export interface PokemonStats {
+  hp: number;
+  attack: number;
+  defense: number;
+  specialAttack: number;
+  specialDefense: number;
+  speed: number;
+}
+
+export interface PokemonAbility {
+  /** PokéAPI ability name, e.g. "inner-focus". */
+  name: string;
+  isHidden: boolean;
+}
+
+/** Full, normalized detail model for the detail screen. */
+export interface PokemonDetails extends PokemonSummary {
+  /** Height in metres (PokéAPI decimetres / 10). */
+  heightM: number;
+  /** Weight in kilograms (PokéAPI hectograms / 10). */
+  weightKg: number;
+  /** Abilities ordered by PokéAPI slot. */
+  abilities: PokemonAbility[];
+  stats: PokemonStats;
+  /** Species flavor text with whitespace normalized, or null if none exists in fr/en. */
+  description: string | null;
+  /** Language of `description`: French preferred, English fallback. */
+  descriptionLanguage: LanguageCode | null;
+}

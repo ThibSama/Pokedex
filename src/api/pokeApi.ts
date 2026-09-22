@@ -1,4 +1,11 @@
-import type { NationalDexId, PokemonBatch, PokemonSummary } from '@/types/pokemon';
+import type {
+  LanguageCode,
+  NationalDexId,
+  PokemonBatch,
+  PokemonDetails,
+  PokemonStats,
+  PokemonSummary,
+} from '@/types/pokemon';
 
 export const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2';
 export const NATIONAL_DEX_MIN: NationalDexId = 1;
@@ -21,12 +28,29 @@ interface RawPokemon {
     };
   };
   types: { slot: number; type: { name: string } }[];
+  /** Decimetres. */
+  height: number;
+  /** Hectograms. */
+  weight: number;
+  abilities: { slot: number; is_hidden: boolean; ability: { name: string } }[];
+  stats: { base_stat: number; stat: { name: string } }[];
 }
 
 /** Subset of the PokéAPI v2 `/pokemon-species/{id}` response that we actually read. */
 interface RawSpecies {
   names: { name: string; language: { name: string } }[];
+  flavor_text_entries: { flavor_text: string; language: { name: string } }[];
 }
+
+/** Explicit PokéAPI stat name → domain key mapping. */
+const STAT_KEYS: Record<string, keyof PokemonStats> = {
+  hp: 'hp',
+  attack: 'attack',
+  defense: 'defense',
+  'special-attack': 'specialAttack',
+  'special-defense': 'specialDefense',
+  speed: 'speed',
+};
 
 export class PokeApiError extends Error {
   constructor(
@@ -63,6 +87,49 @@ function normalizePokemon(raw: RawPokemon, species: RawSpecies): PokemonSummary 
   };
 }
 
+function normalizeStats(raw: RawPokemon['stats']): PokemonStats {
+  const stats: PokemonStats = { hp: 0, attack: 0, defense: 0, specialAttack: 0, specialDefense: 0, speed: 0 };
+  for (const entry of raw) {
+    const key = STAT_KEYS[entry.stat.name];
+    if (key) stats[key] = entry.base_stat;
+  }
+  return stats;
+}
+
+/** Collapse PokéAPI line breaks / form feeds / soft hyphens into single spaces. */
+function normalizeFlavorText(text: string): string {
+  return text
+    .replace(/\u00ad/g, '')
+    .replace(/[\n\f\r]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function pickDescription(species: RawSpecies): Pick<PokemonDetails, 'description' | 'descriptionLanguage'> {
+  for (const language of ['fr', 'en'] as const satisfies readonly LanguageCode[]) {
+    // Entries are ordered by game version; the last one is the most recent wording.
+    const entries = species.flavor_text_entries.filter((entry) => entry.language.name === language);
+    const latest = entries.at(-1);
+    if (latest) {
+      return { description: normalizeFlavorText(latest.flavor_text), descriptionLanguage: language };
+    }
+  }
+  return { description: null, descriptionLanguage: null };
+}
+
+function normalizeDetails(raw: RawPokemon, species: RawSpecies): PokemonDetails {
+  return {
+    ...normalizePokemon(raw, species),
+    heightM: raw.height / 10,
+    weightKg: raw.weight / 10,
+    abilities: [...raw.abilities]
+      .sort((a, b) => a.slot - b.slot)
+      .map((entry) => ({ name: entry.ability.name, isHidden: entry.is_hidden })),
+    stats: normalizeStats(raw.stats),
+    ...pickDescription(species),
+  };
+}
+
 async function getJson<T>(path: string, id: number): Promise<T> {
   const response = await fetch(`${POKEAPI_BASE_URL}/${path}/${id}`);
   if (!response.ok) {
@@ -71,22 +138,37 @@ async function getJson<T>(path: string, id: number): Promise<T> {
   return (await response.json()) as T;
 }
 
-/**
- * Fetch and normalize one Pokémon (detail + species for localized names).
- * Rejects IDs outside 1–251 without a network call.
- */
-export async function fetchPokemonById(id: number): Promise<PokemonSummary> {
+function assertSupportedDexId(id: number): asserts id is NationalDexId {
   if (!isSupportedDexId(id)) {
     throw new RangeError(
       `Pokémon #${id} is outside the supported National Dex range ${NATIONAL_DEX_MIN}–${NATIONAL_DEX_MAX}.`,
     );
   }
-  // For #001–#251, pokemon and pokemon-species share the same id.
-  const [raw, species] = await Promise.all([
-    getJson<RawPokemon>('pokemon', id),
-    getJson<RawSpecies>('pokemon-species', id),
-  ]);
+}
+
+/** One combined load of `/pokemon/{id}` + `/pokemon-species/{id}` (same id for #001–#251). */
+async function fetchRawPair(id: NationalDexId): Promise<[RawPokemon, RawSpecies]> {
+  return Promise.all([getJson<RawPokemon>('pokemon', id), getJson<RawSpecies>('pokemon-species', id)]);
+}
+
+/**
+ * Fetch and normalize one Pokémon summary (detail + species for localized names).
+ * Rejects IDs outside 1–251 without a network call.
+ */
+export async function fetchPokemonById(id: number): Promise<PokemonSummary> {
+  assertSupportedDexId(id);
+  const [raw, species] = await fetchRawPair(id);
   return normalizePokemon(raw, species);
+}
+
+/**
+ * Fetch the full detail model (summary + height/weight/abilities/stats/description).
+ * Rejects IDs outside 1–251 without a network call.
+ */
+export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
+  assertSupportedDexId(id);
+  const [raw, species] = await fetchRawPair(id);
+  return normalizeDetails(raw, species);
 }
 
 export interface FetchPokemonBatchOptions {
