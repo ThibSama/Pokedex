@@ -1,23 +1,26 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router } from 'expo-router';
+import { Image } from 'expo-image';
+import { Link, router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import { fetchPokemonById } from '@/api/pokeApi';
+import { fetchPokemonById, resolveSprite } from '@/api/pokeApi';
 import { useFrameWidth } from '@/components/AppShell';
 import { PrimaryButton, StateView } from '@/components/Controls';
 import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
-import { PokemonCard } from '@/components/PokemonCard';
 import { useFavorites } from '@/favorites/FavoritesProvider';
-import { COLORS, MESSAGE, RADIUS, SHELL, SPACING } from '@/theme/tokens';
+import { COLORS, MESSAGE, OPACITY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
-import type { NationalDexId, PokemonSummary } from '@/types/pokemon';
+import type { NationalDexId, PokemonSummary, SpriteVariant } from '@/types/pokemon';
 import { GRID_GAP, gridColumns, gridTileWidth } from '@/utils/grid';
+import { formatDexNumber } from '@/utils/pokemonList';
 
 type LoadStatus = 'loading' | 'idle' | 'error';
 
+const SHINY_BADGE_SIZE = 24;
+
 export default function CollectionScreen() {
-  const { hydrated, favoriteIds } = useFavorites();
+  const { hydrated, favoriteEntries, favoriteIds, getFavorite } = useFavorites();
   const frameWidth = useFrameWidth();
 
   const [items, setItems] = useState<PokemonSummary[]>([]);
@@ -78,12 +81,16 @@ export default function CollectionScreen() {
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
-  // Three columns on a phone, dropping to two only on unusually narrow frames.
-  const { columns, cardWidth } = useMemo(() => {
+  /**
+   * Box geometry. A single favorite is staged as one wide object instead of a
+   * lonely tile in the top-left corner; from two on, the box fills two by two
+   * and steps down to one column only on unusually narrow frames.
+   */
+  const { columns, slotWidth } = useMemo(() => {
     const content = frameWidth - 2 * SHELL.inset - 2 * SHELL.listPadding;
-    const count = gridColumns(content);
-    return { columns: count, cardWidth: gridTileWidth(content, count) };
-  }, [frameWidth]);
+    const count = favoriteEntries.length <= 1 ? 1 : gridColumns(content, 2);
+    return { columns: count, slotWidth: gridTileWidth(content, count) };
+  }, [frameWidth, favoriteEntries.length]);
 
   const count = favoriteIds.length;
 
@@ -129,12 +136,18 @@ export default function CollectionScreen() {
           <FlatList
             // `items` is already in favorite insertion order, oldest first.
             data={items}
-            key={`grid-${columns}`}
+            key={`box-${columns}`}
             numColumns={columns}
             keyExtractor={(item) => String(item.id)}
-            renderItem={({ item }) => <PokemonCard pokemon={item} width={cardWidth} />}
-            contentContainerStyle={styles.list}
-            columnWrapperStyle={columns > 1 ? styles.column : undefined}
+            renderItem={({ item }) => (
+              <CollectionSlot
+                pokemon={item}
+                width={slotWidth}
+                variant={getFavorite(item.id)?.variant ?? 'normal'}
+              />
+            )}
+            contentContainerStyle={styles.box}
+            columnWrapperStyle={columns > 1 ? styles.boxRow : undefined}
           />
         )}
       </PokedexSurface>
@@ -142,15 +155,102 @@ export default function CollectionScreen() {
   );
 }
 
+/**
+ * One Pokémon in the box: artwork on a soft slot, its name underneath, and a
+ * sparkle badge when the favorite was stored as Shiny. No Dex number, no footer
+ * band — the artwork is the object, the slot is only where it stands.
+ */
+function CollectionSlot({
+  pokemon,
+  width,
+  variant,
+}: {
+  pokemon: PokemonSummary;
+  /** Slot width; the slot is square so the artwork scales with the box. */
+  width: number;
+  /** Stored variant of this favorite, which is what the slot must show. */
+  variant: SpriteVariant;
+}) {
+  // `Link asChild` hands the child to Radix's Slot, which merges styles with an
+  // object spread: a style *function* or array would silently become `{}`. So
+  // press state is tracked here and flattened into the single object Slot takes.
+  const [pressed, setPressed] = useState(false);
+  const style = StyleSheet.flatten<ViewStyle>([styles.slot, { width, height: width }, pressed && styles.pressed]);
+
+  const isShiny = variant === 'shiny';
+  const sprite = resolveSprite(pokemon.sprites, variant);
+
+  return (
+    <Link href={{ pathname: '/pokemon/[id]', params: { id: pokemon.id } }} asChild>
+      <Pressable
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        accessibilityRole="button"
+        accessibilityLabel={`${pokemon.names.fr}${isShiny ? ' shiny' : ''}, numéro ${formatDexNumber(pokemon.id)}, type ${pokemon.types.join(' et ')}`}
+        accessibilityHint="Ouvre la fiche détaillée du Pokémon"
+        style={style}>
+        {isShiny && (
+          <View style={styles.shinyBadge}>
+            <MaterialCommunityIcons name="star-four-points" size={14} color={COLORS.red} />
+          </View>
+        )}
+        {sprite !== null && (
+          <Image source={sprite} style={styles.slotArtwork} contentFit="contain" />
+        )}
+        <Text style={styles.slotName} numberOfLines={1}>
+          {pokemon.names.fr}
+        </Text>
+      </Pressable>
+    </Link>
+  );
+}
+
 const styles = StyleSheet.create({
-  list: {
+  box: {
+    // A sparse box sits in the middle of the sheet instead of hugging the top
+    // edge; once it is taller than the sheet this grows with the content.
+    flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: SHELL.listPadding,
+    paddingTop: SPACING.sm,
     paddingBottom: SPACING.lg,
     gap: GRID_GAP,
-    flexGrow: 1,
   },
-  column: {
+  boxRow: {
     gap: GRID_GAP,
+  },
+  slot: {
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+  },
+  pressed: {
+    opacity: OPACITY.pressed,
+  },
+  slotArtwork: {
+    flex: 1,
+    alignSelf: 'stretch',
+  },
+  slotName: {
+    ...TYPO.body2,
+    color: COLORS.dark,
+    textAlign: 'center',
+  },
+  shinyBadge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    right: SPACING.sm,
+    width: SHINY_BADGE_SIZE,
+    height: SHINY_BADGE_SIZE,
+    borderRadius: RADIUS.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
   },
   emptyBadge: {
     width: 88,

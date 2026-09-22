@@ -26,6 +26,19 @@ export interface PokemonSprites {
   shiny: string | null;
 }
 
+/** Which artwork of a Pokémon a surface should show. */
+export type SpriteVariant = 'normal' | 'shiny';
+
+/**
+ * A favorited Pokémon. Membership is the National Dex id; the variant records
+ * which artwork the user had selected when they added it, so Collection and
+ * Home can show the Pokémon as the user chose it.
+ */
+export interface FavoritePokemon {
+  id: NationalDexId;
+  variant: SpriteVariant;
+}
+
 /** One page of summaries in National Dex order. */
 export interface PokemonBatch {
   items: PokemonSummary[];

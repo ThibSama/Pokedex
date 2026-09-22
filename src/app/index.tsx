@@ -1,17 +1,18 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchPokemonById } from '@/api/pokeApi';
+import { fetchPokemonById, resolveSprite } from '@/api/pokeApi';
+import { PrimaryButton } from '@/components/Controls';
 import { PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
 import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor, withAlpha } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
 import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
-import type { NationalDexId, PokemonSummary } from '@/types/pokemon';
+import type { NationalDexId, PokemonSummary, SpriteVariant } from '@/types/pokemon';
 import { formatDexNumber } from '@/utils/pokemonList';
 
 /** Shown as the hero while the collection is still empty. */
@@ -22,8 +23,13 @@ type HeroResult =
   | { id: NationalDexId; status: 'success'; pokemon: PokemonSummary }
   | { id: NationalDexId; status: 'error'; message: string };
 
-/** Same barely-there Pokéball the detail screen paints behind its artwork. */
-const WATERMARK_SIZE = 208;
+/**
+ * The stage the featured Pokémon stands on: a square area, with the soft disc
+ * and its Pokéball watermark drawn behind the artwork at `STAGE_SIZE` minus the
+ * stage margin on every side.
+ */
+const STAGE_SIZE = 220;
+const STAGE_MARGIN = SPACING.lg;
 
 function pickRandom(ids: readonly NationalDexId[]): NationalDexId {
   return ids[Math.floor(Math.random() * ids.length)];
@@ -31,7 +37,7 @@ function pickRandom(ids: readonly NationalDexId[]): NationalDexId {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { hydrated, favoriteIds } = useFavorites();
+  const { hydrated, favoriteIds, getFavorite } = useFavorites();
 
   const [heroId, setHeroId] = useState<NationalDexId | null>(null);
   const [result, setResult] = useState<HeroResult | null>(null);
@@ -95,75 +101,80 @@ export default function HomeScreen() {
     }
   }, [router, state]);
 
-  const accent = state.status === 'success' ? getTypeColor(state.pokemon.types[0]) : COLORS.medium;
   const favoriteCount = favoriteIds.length;
   const isFallbackHero = hydrated && favoriteCount === 0;
+  // The hero is shown as it was saved: a shiny favorite shows its shiny
+  // artwork, and #197 — which is nobody's favorite — stays Normal.
+  const heroVariant: SpriteVariant =
+    state.status === 'success' ? (getFavorite(state.pokemon.id)?.variant ?? 'normal') : 'normal';
+  const isShinyHero = heroVariant === 'shiny';
+  const heroSprite = state.status === 'success' ? resolveSprite(state.pokemon.sprites, heroVariant) : null;
+  const accent = state.status === 'success' ? getTypeColor(state.pokemon.types[0]) : COLORS.medium;
+
+  const kicker = <Text style={styles.kicker}>{isFallbackHero ? 'Pokémon vedette' : 'Votre vedette'}</Text>;
 
   return (
     <PokedexScreen>
       <PokedexHeader title="Pokédex" subtitle="Johto & Kanto · 251 Pokémon" />
 
       {/* Home is a screen inside the Pokédex, not a separate page: the white
-          sheet holds the hero and the shortcuts, and only the hero itself is
-          painted in the Pokémon's type color. */}
+          sheet is the room the featured Pokémon stands in, and the shortcuts
+          sit under it. */}
       <PokedexSurface>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={[styles.hero, { backgroundColor: accent }]}>
-            {/* Same watermark as the detail screen, so the two heroes read alike. */}
-            <View style={styles.watermark} pointerEvents="none">
-              <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color={OVERLAY.watermark} />
+          {!hydrated || state.status === 'loading' ? (
+            <View style={styles.featured}>
+              {kicker}
+              <Stage>
+                <ActivityIndicator color={COLORS.red} />
+              </Stage>
+              <Text style={MESSAGE.muted}>
+                {hydrated ? 'Chargement du Pokémon…' : 'Lecture de la collection…'}
+              </Text>
             </View>
-
-            <Text style={styles.heroKicker}>{isFallbackHero ? 'Pokémon vedette' : 'Votre vedette'}</Text>
-
-            {!hydrated || state.status === 'loading' ? (
-              <View style={styles.heroPlaceholder} accessibilityRole="progressbar">
-                <ActivityIndicator color={COLORS.white} />
-                <Text style={styles.heroPlaceholderText}>
-                  {hydrated ? 'Chargement du Pokémon…' : 'Lecture de la collection…'}
-                </Text>
+          ) : state.status === 'error' ? (
+            <View style={styles.featured}>
+              {kicker}
+              <Stage />
+              <Text style={MESSAGE.error}>Impossible de charger la vedette.</Text>
+              <Text style={MESSAGE.muted}>{state.message}</Text>
+              <PrimaryButton
+                label="Réessayer"
+                onPress={retry}
+                accessibilityLabel="Réessayer de charger le Pokémon vedette"
+              />
+            </View>
+          ) : (
+            <Pressable
+              onPress={openHero}
+              accessibilityRole="button"
+              accessibilityLabel={`${state.pokemon.names.fr}${isShinyHero ? ' shiny' : ''}, numéro ${formatDexNumber(state.pokemon.id)}, type ${state.pokemon.types.join(' et ')}`}
+              accessibilityHint="Ouvre la fiche détaillée du Pokémon"
+              style={({ pressed }) => [styles.featured, pressed && styles.pressed]}>
+              {kicker}
+              <Stage>
+                {heroSprite !== null && (
+                  <Image
+                    source={heroSprite}
+                    style={styles.artwork}
+                    contentFit="contain"
+                    accessibilityLabel={`Illustration de ${state.pokemon.names.fr}`}
+                  />
+                )}
+              </Stage>
+              <Text style={styles.dexNumber}>{formatDexNumber(state.pokemon.id)}</Text>
+              <Text style={styles.name}>{state.pokemon.names.fr}</Text>
+              <View style={styles.types}>
+                {state.pokemon.types.map((type) => (
+                  <TypeBadge key={type} type={type} />
+                ))}
               </View>
-            ) : state.status === 'error' ? (
-              <View style={styles.heroPlaceholder}>
-                <Text style={styles.heroPlaceholderText}>Impossible de charger la vedette.</Text>
-                <Text style={MESSAGE.onColor}>{state.message}</Text>
-                {/* White pill on the type accent: the hero's own action form,
-                    matching the "Voir la fiche" pill below it. */}
-                <Pressable
-                  onPress={retry}
-                  accessibilityRole="button"
-                  accessibilityLabel="Réessayer de charger le Pokémon vedette"
-                  style={({ pressed }) => [styles.heroPill, pressed && styles.pressed]}>
-                  <Text style={styles.heroPillText}>Réessayer</Text>
-                </Pressable>
+              <View style={styles.cta}>
+                <Text style={styles.ctaText}>Voir la fiche</Text>
+                <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.red} />
               </View>
-            ) : (
-              <Pressable
-                onPress={openHero}
-                accessibilityRole="button"
-                accessibilityLabel={`${state.pokemon.names.fr}, numéro ${formatDexNumber(state.pokemon.id)}, type ${state.pokemon.types.join(' et ')}`}
-                accessibilityHint="Ouvre la fiche détaillée du Pokémon"
-                style={({ pressed }) => [styles.heroBody, pressed && styles.pressed]}>
-                <Image
-                  source={state.pokemon.sprites.normal}
-                  style={styles.heroArtwork}
-                  contentFit="contain"
-                  accessibilityLabel={`Illustration de ${state.pokemon.names.fr}`}
-                />
-                <Text style={styles.heroDexNumber}>{formatDexNumber(state.pokemon.id)}</Text>
-                <Text style={styles.heroName}>{state.pokemon.names.fr}</Text>
-                <View style={styles.heroTypes}>
-                  {state.pokemon.types.map((type) => (
-                    <TypeBadge key={type} type={type} />
-                  ))}
-                </View>
-                <View style={styles.heroCta}>
-                  <Text style={styles.heroPillText}>Voir la fiche</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={16} color={accent} />
-                </View>
-              </Pressable>
-            )}
-          </View>
+            </Pressable>
+          )}
 
           <View style={styles.actions}>
             <ActionCard
@@ -192,6 +203,25 @@ export default function HomeScreen() {
         </ScrollView>
       </PokedexSurface>
     </PokedexScreen>
+  );
+}
+
+/**
+ * The stage: a soft disc with the brand's Pokéball watermark, and whatever
+ * stands on it — the featured artwork, a spinner, or nothing for an empty state.
+ * The artwork is deliberately larger than the disc so the Pokémon reads as
+ * present in the room rather than contained by a card.
+ */
+function Stage({ children }: { children?: ReactNode }) {
+  return (
+    <View style={styles.stage}>
+      <View style={styles.disc} pointerEvents="none">
+        <View style={styles.discWatermark}>
+          <MaterialCommunityIcons name="pokeball" size={STAGE_SIZE} color={OVERLAY.watermark} />
+        </View>
+      </View>
+      {children}
+    </View>
   );
 }
 
@@ -244,82 +274,65 @@ const styles = StyleSheet.create({
     gap: SPACING.lg,
     paddingBottom: SPACING.xxl,
   },
-  hero: {
-    borderRadius: RADIUS.card,
-    padding: SPACING.xl,
+  featured: {
+    alignItems: 'center',
     gap: SPACING.md,
-    minHeight: 380,
-    justifyContent: 'center',
-    overflow: 'hidden',
   },
-  watermark: {
-    position: 'absolute',
-    top: -32,
-    right: -32,
-  },
-  heroKicker: {
+  kicker: {
     ...TYPO.subtitle3,
-    color: OVERLAY.text,
+    color: COLORS.medium,
     letterSpacing: 1,
     textTransform: 'uppercase',
     textAlign: 'center',
   },
-  heroPlaceholder: {
+  stage: {
+    width: STAGE_SIZE,
+    height: STAGE_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.md,
-    flex: 1,
   },
-  heroPlaceholderText: {
-    ...TYPO.subtitle1,
-    color: COLORS.white,
-    textAlign: 'center',
-  },
-  heroPill: {
-    height: 40,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
+  disc: {
+    position: 'absolute',
+    top: STAGE_MARGIN,
+    left: STAGE_MARGIN,
+    right: STAGE_MARGIN,
+    bottom: STAGE_MARGIN,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
+    overflow: 'hidden',
   },
-  heroPillText: {
-    ...TYPO.subtitle1,
-    color: COLORS.dark,
+  discWatermark: {
+    position: 'absolute',
+    top: -24,
+    right: -24,
   },
-  heroBody: {
-    alignItems: 'center',
-    gap: SPACING.sm,
+  artwork: {
+    width: STAGE_SIZE,
+    height: STAGE_SIZE,
   },
-  heroArtwork: {
-    width: 220,
-    height: 220,
-  },
-  heroDexNumber: {
+  dexNumber: {
     ...TYPO.subtitle2,
-    color: OVERLAY.text,
+    color: COLORS.medium,
     fontVariant: ['tabular-nums'],
   },
-  heroName: {
+  name: {
     ...TYPO.headline,
-    fontSize: 32,
-    lineHeight: 40,
-    color: COLORS.white,
+    color: COLORS.dark,
   },
-  heroTypes: {
+  types: {
     flexDirection: 'row',
     gap: SPACING.sm,
-    marginTop: SPACING.xs,
+    marginTop: -SPACING.xs,
   },
-  heroCta: {
-    marginTop: SPACING.md,
+  cta: {
+    marginTop: SPACING.xs,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    paddingLeft: 14,
-    paddingRight: 10,
-    height: 32,
-    borderRadius: RADIUS.card,
-    backgroundColor: COLORS.white,
+  },
+  ctaText: {
+    ...TYPO.subtitle2,
+    color: COLORS.red,
   },
   actions: {
     flexDirection: 'row',

@@ -3,8 +3,10 @@ import type {
   NationalDexId,
   PokemonBatch,
   PokemonDetails,
+  PokemonSprites,
   PokemonStats,
   PokemonSummary,
+  SpriteVariant,
 } from '@/types/pokemon';
 
 export const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2';
@@ -64,6 +66,15 @@ export class PokeApiError extends Error {
 
 export function isSupportedDexId(id: number): id is NationalDexId {
   return Number.isInteger(id) && id >= NATIONAL_DEX_MIN && id <= NATIONAL_DEX_MAX;
+}
+
+/**
+ * The artwork a surface should render for `variant`. PokéAPI has no shiny
+ * artwork for a handful of entries, and a stored shiny favorite must still show
+ * its Pokémon then — as the normal artwork, never as nothing.
+ */
+export function resolveSprite(sprites: PokemonSprites, variant: SpriteVariant): string | null {
+  return variant === 'shiny' ? (sprites.shiny ?? sprites.normal) : sprites.normal;
 }
 
 function pickLocalizedName(species: RawSpecies, language: string): string | undefined {

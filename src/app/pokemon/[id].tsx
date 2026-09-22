@@ -14,15 +14,13 @@ import { getTypeColor } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
 import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
-import type { LanguageCode, PokemonDetails, PokemonStats } from '@/types/pokemon';
+import type { LanguageCode, PokemonDetails, PokemonStats, SpriteVariant } from '@/types/pokemon';
 import { formatDexNumber, humanizeSlug } from '@/utils/pokemonList';
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'success'; details: PokemonDetails };
-
-type SpriteVariant = 'normal' | 'shiny';
 
 /** Figma order and labels. */
 const STAT_ROWS: { key: keyof PokemonStats; label: string }[] = [
@@ -219,7 +217,7 @@ export default function PokemonDetailScreen() {
                 accent={accent}
                 active={favorite}
                 disabled={!hydrated}
-                onPress={() => toggleFavorite(details.id)}
+                onPress={() => toggleFavorite(details.id, variant)}
                 accessibilityLabel={
                   favorite ? `Retirer ${name} de la collection` : `Ajouter ${name} à la collection`
                 }
