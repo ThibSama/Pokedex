@@ -8,6 +8,7 @@ import { CryButton } from '@/components/CryButton';
 import { StatBar } from '@/components/StatBar';
 import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor, PALETTE } from '@/constants/typeColors';
+import { useFavorites } from '@/favorites/FavoritesProvider';
 import type { LanguageCode, PokemonDetails, PokemonStats } from '@/types/pokemon';
 import { formatDexNumber } from '@/utils/pokemonList';
 
@@ -44,6 +45,8 @@ function formatMetric(value: number, unit: string) {
 export default function PokemonDetailScreen() {
   const { id: idParam } = useLocalSearchParams<{ id: string }>();
   const id = parseDexId(idParam);
+
+  const { hydrated, isFavorite, toggleFavorite } = useFavorites();
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -125,6 +128,7 @@ export default function PokemonDetailScreen() {
   const spriteUrl = details.sprites[variant];
   const shinyAvailable = details.sprites.shiny !== null;
   const name = details.names[language];
+  const favorite = isFavorite(details.id);
 
   return (
     <View style={[styles.screen, { backgroundColor: accent }]}>
@@ -174,6 +178,26 @@ export default function PokemonDetailScreen() {
             <Toggle label="EN" selected={language === 'en'} onPress={() => setLanguage('en')} accent={accent} />
             <View style={styles.toggleGap} />
             <CryButton apiName={details.apiName} accent={accent} />
+            <Pressable
+              onPress={() => toggleFavorite(details.id)}
+              disabled={!hydrated}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={
+                favorite
+                  ? `Retirer ${name} de la collection`
+                  : `Ajouter ${name} à la collection`
+              }
+              accessibilityState={{ disabled: !hydrated, selected: favorite }}
+              style={[
+                styles.favorite,
+                favorite && { backgroundColor: accent, borderColor: accent },
+                !hydrated && styles.toggleDisabled,
+              ]}>
+              <Text style={[styles.favoriteText, favorite && styles.toggleTextSelected]}>
+                {favorite ? '★ Collection' : '☆ Collection'}
+              </Text>
+            </Pressable>
           </View>
 
           <Text style={[styles.sectionTitle, { color: accent }]}>About</Text>
@@ -316,6 +340,18 @@ const styles = StyleSheet.create({
   },
   toggleDisabled: {
     opacity: 0.4,
+  },
+  favorite: {
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: PALETTE.light,
+  },
+  favoriteText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: PALETTE.medium,
   },
   toggleText: {
     fontSize: 10,
