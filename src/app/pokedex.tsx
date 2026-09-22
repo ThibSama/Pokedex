@@ -1,18 +1,15 @@
 import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-export default function HomeScreen() {
+export default function PokedexScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Pokédex</Text>
-      <View style={styles.links}>
-        <Link href="/pokedex" style={styles.link}>
-          Open Pokédex
-        </Link>
-        <Link href="/collection" style={styles.link}>
-          Open Collection
-        </Link>
-      </View>
+      <Text style={styles.placeholder}>Pokémon list coming soon.</Text>
+      {/* Temporary navigation action until the list exists. */}
+      <Link href="/pokemon/197" style={styles.link}>
+        Open #197 (temporary)
+      </Link>
     </View>
   );
 }
@@ -22,16 +19,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 24,
+    gap: 16,
     padding: 16,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '600',
   },
-  links: {
-    gap: 12,
-    alignItems: 'center',
+  placeholder: {
+    fontSize: 16,
+    color: '#6b7280',
   },
   link: {
     fontSize: 18,
