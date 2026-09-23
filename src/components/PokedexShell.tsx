@@ -1,9 +1,12 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router, Stack } from 'expo-router';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { changeAppLanguage, useAppLanguage } from '@/i18n';
+import { APP_LANGUAGES } from '@/i18n/languages';
 import { COLORS, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 
@@ -54,10 +57,11 @@ interface PokedexHeaderProps {
 
 /**
  * The application header: back affordance, Pokéball brand mark, bold Poppins
- * title, an optional right-aligned accessory, and whatever control rows the
- * screen adds as children.
+ * title, an optional right-aligned accessory, the app-wide language switch, and
+ * whatever control rows the screen adds as children.
  */
 export function PokedexHeader({ title, subtitle, trailing, onBack, children }: PokedexHeaderProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const hasBack = onBack !== undefined;
 
@@ -69,7 +73,7 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
             onPress={onBack}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Revenir à l’écran précédent"
+            accessibilityLabel={t('shell.back')}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
             <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.white} />
           </Pressable>
@@ -82,8 +86,46 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
           {subtitle !== undefined && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
         {trailing !== undefined && <Text style={styles.trailing}>{trailing}</Text>}
+        <LanguageSwitch />
       </View>
       {children}
+    </View>
+  );
+}
+
+/**
+ * The one language control, reachable from every screen because every screen
+ * mounts this header. It switches the whole app in place — no navigation, no
+ * refetch — and the choice is persisted for the next launch.
+ */
+function LanguageSwitch() {
+  const { t } = useTranslation();
+  const language = useAppLanguage();
+
+  return (
+    <View style={styles.language} accessibilityRole="radiogroup" accessibilityLabel={t('language.label')}>
+      {APP_LANGUAGES.map((code) => {
+        const selected = code === language;
+        return (
+          <Pressable
+            key={code}
+            onPress={() => changeAppLanguage(code)}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            accessibilityLabel={t(`language.names.${code}`)}
+            accessibilityLanguage={code}
+            style={({ pressed }) => [
+              styles.languageOption,
+              selected && styles.languageOptionSelected,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[styles.languageText, selected && styles.languageTextSelected]}>
+              {code.toUpperCase()}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -153,6 +195,32 @@ const styles = StyleSheet.create({
     ...TYPO.subtitle2,
     color: COLORS.white,
     fontVariant: ['tabular-nums'],
+  },
+  language: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    padding: 2,
+    borderRadius: RADIUS.pill,
+    backgroundColor: OVERLAY.fill,
+  },
+  languageOption: {
+    height: 20,
+    minWidth: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderRadius: RADIUS.pill,
+  },
+  languageOptionSelected: {
+    backgroundColor: COLORS.white,
+  },
+  languageText: {
+    ...TYPO.subtitle3,
+    color: COLORS.white,
+  },
+  languageTextSelected: {
+    color: COLORS.red,
   },
   surface: {
     backgroundColor: COLORS.white,

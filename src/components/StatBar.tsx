@@ -20,7 +20,10 @@ const FILL_DURATION_MS = 800;
 const TRACK_HEIGHT = 6;
 
 interface StatBarProps {
+  /** Short label painted in the row, e.g. `ATK`. */
   label: string;
+  /** What a screen reader announces for the whole row, e.g. "Attack 110". */
+  accessibilityLabel?: string;
   value: number;
   /** Accent color for label, fill and tinted track. */
   color: string;
@@ -32,7 +35,7 @@ interface StatBarProps {
  * Animated base-stat row. The fill starts at 0 on mount and eases to
  * `value / 255` on the UI thread; re-renders with the same `value` do not restart it.
  */
-export function StatBar({ label, value, color, delayMs = 0 }: StatBarProps) {
+export function StatBar({ label, accessibilityLabel, value, color, delayMs = 0 }: StatBarProps) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -47,7 +50,7 @@ export function StatBar({ label, value, color, delayMs = 0 }: StatBarProps) {
   }));
 
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessible accessibilityLabel={accessibilityLabel}>
       <Text style={[styles.label, { color }]}>{label}</Text>
       <View style={styles.divider} />
       <Text style={styles.value}>{String(value).padStart(3, '0')}</Text>

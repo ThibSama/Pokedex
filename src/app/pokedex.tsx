@@ -1,5 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   FlatList,
@@ -30,6 +31,8 @@ import {
 } from "@/components/PokedexShell";
 import { PokemonCard } from "@/components/PokemonCard";
 import { getTypeColor, TYPE_NAMES } from "@/constants/typeColors";
+import { LOCALE_TAGS } from "@/i18n/languages";
+import { usePokemonText } from "@/i18n/pokemonText";
 import {
   COLORS,
   MESSAGE,
@@ -53,10 +56,6 @@ import {
 
 type LoadStatus = "loading" | "loadingMore" | "idle" | "error";
 
-const SORT_LABELS: Record<SortMode, string> = {
-  dex: "numéro du Pokédex",
-  name: "nom",
-};
 /** Icon-only sort control: the glyph itself says which order is active. */
 const SORT_ICONS: Record<
   SortMode,
@@ -88,6 +87,8 @@ function gridContentWidth(frameWidth: number): number {
 }
 
 export default function PokedexListScreen() {
+  const { t } = useTranslation();
+  const { language, typeLabel } = usePokemonText();
   const width = useFrameWidth();
   const insets = useSafeAreaInsets();
 
@@ -120,9 +121,10 @@ export default function PokedexListScreen() {
       })
       .catch((error: unknown) => {
         if (!mounted.current) return;
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unknown error",
-        );
+        // Never null on failure: the hydration chain stops on a non-null
+        // error. An empty message is translated at render time instead, so
+        // this callback stays independent of the language.
+        setErrorMessage(error instanceof Error ? error.message : "");
         setStatus("error");
       })
       .finally(() => {
@@ -178,11 +180,19 @@ export default function PokedexListScreen() {
     setFilterOpen(false);
   };
 
-  // Search/sort/filter are derived purely from client state — no network involved.
+  // Search/sort/filter are derived purely from client state — no network
+  // involved, including when the language changes the name sort.
   const visible = useMemo(
-    () => applyListOptions(items, options),
-    [items, options],
+    () => applyListOptions(items, options, language),
+    [items, options, language],
   );
+  // The same 18 canonical slugs, ordered by the label the user actually reads.
+  const typeOptions = useMemo(() => {
+    const collator = new Intl.Collator(LOCALE_TAGS[language]);
+    return [...TYPE_NAMES].sort((a, b) =>
+      collator.compare(typeLabel(a), typeLabel(b)),
+    );
+  }, [language, typeLabel]);
   const cardWidth = useMemo(
     () => gridTileWidth(gridContentWidth(width), COLUMNS),
     [width],
@@ -195,7 +205,7 @@ export default function PokedexListScreen() {
   return (
     <PokedexScreen>
       {/* One coherent red header area: back, title, search, sort and the type filter. */}
-      <PokedexHeader title="Pokédex" onBack={() => goBack("/")}>
+      <PokedexHeader title={t("pokedex.title")} onBack={() => goBack("/")}>
         <View style={styles.controlsRow}>
           <View
             style={[
@@ -212,14 +222,14 @@ export default function PokedexListScreen() {
               onChangeText={(query) => setOptions((o) => ({ ...o, query }))}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              placeholder="Rechercher"
+              placeholder={t("pokedex.searchPlaceholder")}
               placeholderTextColor={COLORS.medium}
               autoCorrect={false}
               autoCapitalize="none"
               clearButtonMode="while-editing"
               style={[styles.searchInput, WEB_FOCUS_RING_RESET]}
-              accessibilityLabel="Rechercher un Pokémon parmi ceux déjà chargés"
-              accessibilityHint="Filtre la liste par nom français, nom anglais ou numéro du Pokédex"
+              accessibilityLabel={t("pokedex.searchLabel")}
+              accessibilityHint={t("pokedex.searchHint")}
             />
           </View>
           <View style={styles.sortGroup} accessibilityRole="radiogroup">
@@ -231,7 +241,7 @@ export default function PokedexListScreen() {
                   onPress={() => setOptions((o) => ({ ...o, sort: mode }))}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={`Trier par ${SORT_LABELS[mode]}`}
+                  accessibilityLabel={t(`pokedex.sort.${mode}`)}
                   style={({ pressed }) => [
                     styles.sortButton,
                     selected && styles.sortButtonSelected,
@@ -257,8 +267,10 @@ export default function PokedexListScreen() {
             accessibilityState={{ expanded: filterOpen }}
             accessibilityLabel={
               selectedType === null
-                ? "Filtrer par type, tous les types"
-                : `Filtrer par type, ${selectedType}`
+                ? t("pokedex.filter.buttonAll")
+                : t("pokedex.filter.buttonType", {
+                    type: typeLabel(selectedType),
+                  })
             }
             style={({ pressed }) => [
               styles.filterButton,
@@ -278,7 +290,9 @@ export default function PokedexListScreen() {
               />
             )}
             <Text style={styles.filterLabel} numberOfLines={1}>
-              {selectedType ?? "Tous"}
+              {selectedType === null
+                ? t("pokedex.filter.all")
+                : typeLabel(selectedType)}
             </Text>
             <MaterialCommunityIcons
               name="chevron-down"
@@ -293,15 +307,15 @@ export default function PokedexListScreen() {
         {isInitialLoading ? (
           <StateView>
             <ActivityIndicator color={COLORS.red} />
-            <Text style={MESSAGE.muted}>Chargement des Pokémon…</Text>
+            <Text style={MESSAGE.muted}>{t("pokedex.loading")}</Text>
           </StateView>
         ) : isInitialError ? (
           <StateView>
-            <Text style={MESSAGE.error}>
-              Impossible de charger les Pokémon.
+            <Text style={MESSAGE.error}>{t("pokedex.loadError")}</Text>
+            <Text style={MESSAGE.muted}>
+              {errorMessage || t("common.unknownError")}
             </Text>
-            <Text style={MESSAGE.muted}>{errorMessage}</Text>
-            <PrimaryButton label="Réessayer" onPress={retry} />
+            <PrimaryButton label={t("common.retry")} onPress={retry} />
           </StateView>
         ) : (
           <FlatList
@@ -317,9 +331,7 @@ export default function PokedexListScreen() {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <StateView>
-                <Text style={MESSAGE.muted}>
-                  Aucun Pokémon chargé ne correspond.
-                </Text>
+                <Text style={MESSAGE.muted}>{t("pokedex.empty")}</Text>
               </StateView>
             }
             ListFooterComponent={
@@ -346,7 +358,7 @@ export default function PokedexListScreen() {
             style={StyleSheet.absoluteFill}
             onPress={() => setFilterOpen(false)}
             accessibilityRole="button"
-            accessibilityLabel="Fermer le sélecteur de type"
+            accessibilityLabel={t("pokedex.filter.close")}
           />
 
           <View
@@ -355,22 +367,28 @@ export default function PokedexListScreen() {
               { paddingBottom: insets.bottom + SPACING.lg },
             ]}
             accessibilityViewIsModal>
-            <Text style={styles.filterPanelTitle}>Type</Text>
+            <Text style={styles.filterPanelTitle}>
+              {t("pokedex.filter.panelTitle")}
+            </Text>
 
             <ScrollView
               contentContainerStyle={styles.filterOptions}
               showsVerticalScrollIndicator={false}>
               <FilterOption
-                label="Tous"
+                label={t("pokedex.filter.all")}
+                accessibilityLabel={t("pokedex.filter.optionAll")}
                 color={null}
                 selected={selectedType === null}
                 onPress={() => chooseType(null)}
               />
 
-              {TYPE_NAMES.map((type) => (
+              {typeOptions.map((type) => (
                 <FilterOption
                   key={type}
-                  label={type}
+                  label={typeLabel(type)}
+                  accessibilityLabel={t("pokedex.filter.optionType", {
+                    type: typeLabel(type),
+                  })}
                   color={getTypeColor(type)}
                   selected={selectedType === type}
                   onPress={() => chooseType(type)}
@@ -384,18 +402,17 @@ export default function PokedexListScreen() {
   );
 }
 
-function noop() {
-  // Intentionally empty: this handler only stops a tap from reaching the backdrop.
-}
-
 /** One selectable type in the filter panel: color indicator plus label. */
 function FilterOption({
   label,
+  accessibilityLabel,
   color,
   selected,
   onPress,
 }: {
+  /** Localized label; the option's value stays the canonical slug in the caller. */
   label: string;
+  accessibilityLabel: string;
   /** Type accent, or null for the catch-all option, which shows no dot. */
   color: string | null;
   selected: boolean;
@@ -406,7 +423,7 @@ function FilterOption({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={label === "Tous" ? "Tous les types" : `Type ${label}`}
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
         styles.option,
         selected && { backgroundColor: color ?? COLORS.red },
@@ -442,22 +459,27 @@ function ListFooter({
   errorMessage: string | null;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation();
+  const progress = t("pokedex.progress", {
+    loaded: loadedCount,
+    total: NATIONAL_DEX_TOTAL,
+  });
   if (status === "loadingMore") {
     return (
       <View style={styles.footer} accessibilityRole="progressbar">
         <ActivityIndicator color={COLORS.red} />
-        <Text style={MESSAGE.muted}>
-          {loadedCount} / {NATIONAL_DEX_TOTAL} Pokémon chargés
-        </Text>
+        <Text style={MESSAGE.muted}>{progress}</Text>
       </View>
     );
   }
   if (status === "error") {
     return (
       <View style={styles.footer}>
-        <Text style={MESSAGE.error}>Échec du chargement.</Text>
-        <Text style={MESSAGE.muted}>{errorMessage}</Text>
-        <PrimaryButton label="Réessayer" onPress={onRetry} />
+        <Text style={MESSAGE.error}>{t("pokedex.pageError")}</Text>
+        <Text style={MESSAGE.muted}>
+          {errorMessage || t("common.unknownError")}
+        </Text>
+        <PrimaryButton label={t("common.retry")} onPress={onRetry} />
       </View>
     );
   }
@@ -465,7 +487,7 @@ function ListFooter({
     return (
       <View style={styles.footer}>
         <Text style={MESSAGE.muted}>
-          Fin du Pokédex — {loadedCount} Pokémon chargés.
+          {t("pokedex.end", { count: loadedCount })}
         </Text>
       </View>
     );
@@ -474,9 +496,7 @@ function ListFooter({
   // already on its way.
   return (
     <View style={styles.footer}>
-      <Text style={MESSAGE.muted}>
-        {loadedCount} / {NATIONAL_DEX_TOTAL} Pokémon chargés
-      </Text>
+      <Text style={MESSAGE.muted}>{progress}</Text>
     </View>
   );
 }
@@ -556,7 +576,6 @@ const styles = StyleSheet.create({
   filterLabel: {
     ...TYPO.subtitle3,
     color: COLORS.dark,
-    textTransform: "capitalize",
   },
   filterBackdrop: {
     flex: 1,
@@ -606,7 +625,6 @@ const styles = StyleSheet.create({
   optionText: {
     ...TYPO.body2,
     color: COLORS.dark,
-    textTransform: "capitalize",
   },
   optionTextSelected: {
     ...TYPO.subtitle2,

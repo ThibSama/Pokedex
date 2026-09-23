@@ -2,6 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -18,24 +19,26 @@ import { StatBar } from '@/components/StatBar';
 import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
+import { formatDecimal, pickLocalized, usePokemonText } from '@/i18n/pokemonText';
 import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
-import type { LanguageCode, PokemonDetails, PokemonStats, SpriteVariant } from '@/types/pokemon';
-import { formatDexNumber, humanizeSlug } from '@/utils/pokemonList';
+import type { PokemonDetails, PokemonStats, SpriteVariant } from '@/types/pokemon';
+import { formatDexNumber } from '@/utils/pokemonList';
 
+/** An error keeps only the technical message; fallback wording is translated at render. */
 type LoadState =
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string | null }
   | { status: 'success'; details: PokemonDetails };
 
-/** Figma order and labels. */
-const STAT_ROWS: { key: keyof PokemonStats; label: string }[] = [
-  { key: 'hp', label: 'HP' },
-  { key: 'attack', label: 'ATK' },
-  { key: 'defense', label: 'DEF' },
-  { key: 'specialAttack', label: 'SATK' },
-  { key: 'specialDefense', label: 'SDEF' },
-  { key: 'speed', label: 'SPD' },
+/** Figma order; the labels come from the `stats` resources. */
+const STAT_ROWS: readonly (keyof PokemonStats)[] = [
+  'hp',
+  'attack',
+  'defense',
+  'specialAttack',
+  'specialDefense',
+  'speed',
 ];
 const STAT_STAGGER_MS = 80;
 
@@ -58,10 +61,6 @@ function parseDexId(param: string | string[] | undefined): number | null {
   return isSupportedDexId(id) ? id : null;
 }
 
-function formatMetric(value: number, unit: string) {
-  return `${value.toFixed(1).replace('.', ',')} ${unit}`;
-}
-
 /** Swap the current entry rather than stacking one screen per neighbour visited. */
 function goToDexId(id: number) {
   router.replace({ pathname: '/pokemon/[id]', params: { id } });
@@ -70,6 +69,8 @@ function goToDexId(id: number) {
 export default function PokemonDetailScreen() {
   const { id: idParam, variant: variantParam } = useLocalSearchParams<{ id: string; variant?: string }>();
   const id = parseDexId(idParam);
+  const { t } = useTranslation();
+  const { language, name: displayName } = usePokemonText();
 
   const { hydrated, isFavorite, toggleFavorite } = useFavorites();
 
@@ -78,8 +79,8 @@ export default function PokemonDetailScreen() {
   // Local UI state only: switches between already-fetched data, never refetches.
   // A route variant (the Home hero, a Collection slot) opens the screen on that
   // presentation; anything else — including the plain Pokédex list — is Normal.
+  // Independent of the app language, which is global and lives in the header.
   const [variant, setVariant] = useState<SpriteVariant>(variantParam === 'shiny' ? 'shiny' : 'normal');
-  const [language, setLanguage] = useState<LanguageCode>('fr');
 
   useEffect(() => {
     if (id === null) return;
@@ -90,7 +91,7 @@ export default function PokemonDetailScreen() {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setState({ status: 'error', message: error instanceof Error ? error.message : 'Unknown error' });
+          setState({ status: 'error', message: error instanceof Error ? error.message : null });
         }
       });
     return () => {
@@ -108,12 +109,12 @@ export default function PokemonDetailScreen() {
   if (id === null) {
     return (
       <PokedexScreen>
-        <PokedexHeader title="Pokémon" onBack={() => goBack('/pokedex')} />
+        <PokedexHeader title={t('detail.fallbackTitle')} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
           <StateView>
-            <Text style={MESSAGE.error}>Identifiant invalide.</Text>
+            <Text style={MESSAGE.error}>{t('detail.invalidId')}</Text>
             <Text style={MESSAGE.muted}>
-              « {String(idParam)} » n’est pas un numéro du Pokédex national ({NATIONAL_DEX_MIN}–{NATIONAL_DEX_MAX}).
+              {t('detail.invalidIdBody', { value: String(idParam), min: NATIONAL_DEX_MIN, max: NATIONAL_DEX_MAX })}
             </Text>
           </StateView>
         </PokedexSurface>
@@ -124,11 +125,11 @@ export default function PokemonDetailScreen() {
   if (state.status === 'loading') {
     return (
       <PokedexScreen>
-        <PokedexHeader title="Pokémon" trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
+        <PokedexHeader title={t('detail.fallbackTitle')} trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
           <StateView>
             <ActivityIndicator color={COLORS.red} />
-            <Text style={MESSAGE.muted}>Chargement de {formatDexNumber(id)}…</Text>
+            <Text style={MESSAGE.muted}>{t('detail.loading', { number: formatDexNumber(id) })}</Text>
           </StateView>
         </PokedexSurface>
       </PokedexScreen>
@@ -138,12 +139,12 @@ export default function PokemonDetailScreen() {
   if (state.status === 'error') {
     return (
       <PokedexScreen>
-        <PokedexHeader title="Pokémon" trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
+        <PokedexHeader title={t('detail.fallbackTitle')} trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
           <StateView>
-            <Text style={MESSAGE.error}>Impossible de charger {formatDexNumber(id)}.</Text>
-            <Text style={MESSAGE.muted}>{state.message}</Text>
-            <PrimaryButton label="Réessayer" onPress={retry} />
+            <Text style={MESSAGE.error}>{t('detail.loadError', { number: formatDexNumber(id) })}</Text>
+            <Text style={MESSAGE.muted}>{state.message ?? t('common.unknownError')}</Text>
+            <PrimaryButton label={t('common.retry')} onPress={retry} />
           </StateView>
         </PokedexSurface>
       </PokedexScreen>
@@ -156,8 +157,17 @@ export default function PokemonDetailScreen() {
   // nothing, and the control below reflects that fallback.
   const effectiveVariant: SpriteVariant = variant === 'shiny' && !shinyAvailable ? 'normal' : variant;
   const spriteUrl = resolveSprite(details.sprites, effectiveVariant);
-  const name = details.names[language];
+  const name = displayName(details);
   const favorite = isFavorite(details.id);
+  // Everything below is read from the already-loaded detail in the active
+  // language, so a language switch re-renders without a request.
+  const description = pickLocalized(details.descriptions, language) ?? t('detail.noDescription');
+  const abilityLines = details.abilities.map((ability) =>
+    ability.isHidden
+      ? t('detail.hiddenAbility', { name: ability.names[language] })
+      : ability.names[language],
+  );
+  const variantLabel = t(`detail.variant.${effectiveVariant}`);
 
   return (
     <PokedexScreen>
@@ -184,11 +194,11 @@ export default function PokemonDetailScreen() {
                 source={spriteUrl}
                 style={styles.artwork}
                 contentFit="contain"
-                accessibilityLabel={`${name} (${effectiveVariant})`}
+                accessibilityLabel={t('detail.artwork', { name, variant: variantLabel })}
               />
             ) : (
               <View style={[styles.artwork, styles.artworkMissing]}>
-                <Text style={MESSAGE.onColor}>Aucune image</Text>
+                <Text style={MESSAGE.onColor}>{t('detail.noArtwork')}</Text>
               </View>
             )}
             <HeroChevron direction="next" currentId={details.id} />
@@ -210,64 +220,56 @@ export default function PokemonDetailScreen() {
             <View style={styles.actions}>
               <Segmented
                 accent={accent}
-                accessibilityLabel="Apparence"
+                accessibilityLabel={t('detail.variantGroup')}
                 options={[
-                  { key: 'normal', label: 'Normal' },
-                  { key: 'shiny', label: 'Shiny', disabled: !shinyAvailable },
+                  { key: 'normal', label: t('detail.variant.normal') },
+                  { key: 'shiny', label: t('detail.variant.shiny'), disabled: !shinyAvailable },
                 ]}
                 value={effectiveVariant}
                 onChange={setVariant}
               />
-              <Segmented
-                accent={accent}
-                accessibilityLabel="Langue du nom"
-                options={[
-                  { key: 'fr', label: 'FR' },
-                  { key: 'en', label: 'EN' },
-                ]}
-                value={language}
-                onChange={setLanguage}
-              />
-              <CryButton apiName={details.apiName} accent={accent} />
+              <CryButton apiName={details.apiName} name={name} accent={accent} />
               <IconButton
                 icon={favorite ? 'heart' : 'heart-outline'}
                 accent={accent}
                 active={favorite}
                 disabled={!hydrated}
                 onPress={() => toggleFavorite(details.id, effectiveVariant)}
-                accessibilityLabel={
-                  favorite ? `Retirer ${name} de la collection` : `Ajouter ${name} à la collection`
-                }
+                accessibilityLabel={t(favorite ? 'detail.favoriteRemove' : 'detail.favoriteAdd', { name })}
                 accessibilityState={{ selected: favorite }}
               />
             </View>
           </View>
 
           <View style={styles.group}>
-            <Text style={[styles.sectionTitle, { color: accent }]}>About</Text>
+            <Text style={[styles.sectionTitle, { color: accent }]}>{t('detail.about')}</Text>
             <View style={styles.about}>
-              <AboutColumn label="Poids" icon="weight-kilogram" lines={[formatMetric(details.weightKg, 'kg')]} />
-              <View style={styles.aboutDivider} />
-              <AboutColumn label="Taille" icon="ruler" lines={[formatMetric(details.heightM, 'm')]} />
+              <AboutColumn
+                label={t('detail.weight')}
+                icon="weight-kilogram"
+                lines={[t('detail.kilograms', { value: formatDecimal(details.weightKg, language) })]}
+              />
               <View style={styles.aboutDivider} />
               <AboutColumn
-                label="Talents"
-                lines={details.abilities.map((ability) =>
-                  ability.isHidden ? `${humanizeSlug(ability.name)} (caché)` : humanizeSlug(ability.name),
-                )}
+                label={t('detail.height')}
+                icon="ruler"
+                lines={[t('detail.metres', { value: formatDecimal(details.heightM, language) })]}
               />
+              <View style={styles.aboutDivider} />
+              <AboutColumn label={t('detail.abilities')} lines={abilityLines} />
             </View>
 
-            <Text style={styles.description}>{details.description ?? 'Aucune description disponible.'}</Text>
+            <Text style={styles.description}>{description}</Text>
           </View>
 
           <View style={[styles.group, styles.statsGroup]}>
-            <Text style={[styles.sectionTitle, { color: accent }]}>Base Stats</Text>
+            <Text style={[styles.sectionTitle, { color: accent }]}>{t('detail.baseStats')}</Text>
             <View style={styles.stats}>
-              {STAT_ROWS.map(({ key, label }, index) => (
+              {STAT_ROWS.map((key, index) => (
                 <StatBar
                   key={key}
-                  label={label}
+                  label={t(`stats.${key}.short`)}
+                  accessibilityLabel={t('stats.value', { stat: t(`stats.${key}.long`), value: details.stats[key] })}
                   value={details.stats[key]}
                   color={accent}
                   delayMs={index * STAT_STAGGER_MS}
@@ -286,6 +288,7 @@ export default function PokemonDetailScreen() {
  * Dex boundaries so the artwork stays centered.
  */
 function HeroChevron({ direction, currentId }: { direction: 'previous' | 'next'; currentId: number }) {
+  const { t } = useTranslation();
   const targetId = direction === 'previous' ? currentId - 1 : currentId + 1;
   if (!isSupportedDexId(targetId)) return <View style={styles.chevron} />;
   return (
@@ -293,11 +296,9 @@ function HeroChevron({ direction, currentId }: { direction: 'previous' | 'next';
       onPress={() => goToDexId(targetId)}
       hitSlop={8}
       accessibilityRole="button"
-      accessibilityLabel={
-        direction === 'previous'
-          ? `Pokémon précédent, ${formatDexNumber(targetId)}`
-          : `Pokémon suivant, ${formatDexNumber(targetId)}`
-      }
+      accessibilityLabel={t(direction === 'previous' ? 'detail.previous' : 'detail.next', {
+        number: formatDexNumber(targetId),
+      })}
       style={({ pressed }) => [styles.chevron, pressed && styles.pressed]}>
       <MaterialCommunityIcons
         name={direction === 'previous' ? 'chevron-left' : 'chevron-right'}
@@ -321,6 +322,7 @@ function Segmented<T extends string>({
   accent: string;
   accessibilityLabel: string;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.segmented} accessibilityRole="radiogroup" accessibilityLabel={accessibilityLabel}>
       {options.map((option) => {
@@ -332,7 +334,7 @@ function Segmented<T extends string>({
             disabled={option.disabled}
             accessibilityRole="button"
             accessibilityState={{ selected, disabled: option.disabled ?? false }}
-            accessibilityLabel={`${accessibilityLabel} : ${option.label}`}
+            accessibilityLabel={t('detail.segmentOption', { group: accessibilityLabel, option: option.label })}
             style={[
               styles.segment,
               selected && { backgroundColor: accent },

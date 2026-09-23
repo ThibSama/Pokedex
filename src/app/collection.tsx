@@ -2,6 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
 import { Link, router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { fetchPokemonById, resolveSprite } from '@/api/pokeApi';
@@ -9,17 +10,18 @@ import { useFrameWidth } from '@/components/AppShell';
 import { PrimaryButton, StateView } from '@/components/Controls';
 import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
 import { useFavorites } from '@/favorites/FavoritesProvider';
+import { usePokemonText } from '@/i18n/pokemonText';
 import { COLORS, MESSAGE, OPACITY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { NationalDexId, PokemonSummary, SpriteVariant } from '@/types/pokemon';
 import { GRID_GAP, gridColumns, gridTileWidth } from '@/utils/grid';
-import { formatDexNumber } from '@/utils/pokemonList';
 
 type LoadStatus = 'loading' | 'idle' | 'error';
 
 const SHINY_BADGE_SIZE = 24;
 
 export default function CollectionScreen() {
+  const { t } = useTranslation();
   const { hydrated, favoriteEntries, favoriteIds, getFavorite } = useFavorites();
   const frameWidth = useFrameWidth();
 
@@ -70,7 +72,7 @@ export default function CollectionScreen() {
       })
       .catch((error: unknown) => {
         if (cancelled || !mounted.current) return;
-        setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+        setErrorMessage(error instanceof Error ? error.message : null);
         setStatus('error');
       });
 
@@ -97,8 +99,8 @@ export default function CollectionScreen() {
   return (
     <PokedexScreen>
       <PokedexHeader
-        title="Collection"
-        trailing={hydrated && count > 0 ? `${count} favori${count > 1 ? 's' : ''}` : undefined}
+        title={t('collection.title')}
+        trailing={hydrated && count > 0 ? t('collection.count', { count }) : undefined}
         onBack={() => goBack('/')}
       />
 
@@ -107,29 +109,27 @@ export default function CollectionScreen() {
           <StateView>
             <ActivityIndicator color={COLORS.red} />
             <Text style={MESSAGE.muted}>
-              {hydrated ? 'Chargement de la collection…' : 'Lecture de la collection…'}
+              {t(hydrated ? 'collection.loading' : 'common.readingCollection')}
             </Text>
           </StateView>
         ) : status === 'error' ? (
           <StateView>
-            <Text style={MESSAGE.error}>Collection indisponible</Text>
-            <Text style={MESSAGE.muted}>{errorMessage}</Text>
-            <PrimaryButton label="Réessayer" onPress={retry} />
+            <Text style={MESSAGE.error}>{t('collection.error')}</Text>
+            <Text style={MESSAGE.muted}>{errorMessage ?? t('common.unknownError')}</Text>
+            <PrimaryButton label={t('common.retry')} onPress={retry} />
           </StateView>
         ) : items.length === 0 ? (
           <StateView>
             <View style={styles.emptyBadge}>
               <MaterialCommunityIcons name="heart-outline" size={44} color={COLORS.red} />
             </View>
-            <Text style={styles.emptyTitle}>Collection vide</Text>
-            <Text style={MESSAGE.muted}>
-              Ouvrez la fiche d’un Pokémon et touchez le cœur pour l’ajouter à votre collection.
-            </Text>
+            <Text style={styles.emptyTitle}>{t('collection.emptyTitle')}</Text>
+            <Text style={MESSAGE.muted}>{t('collection.emptyBody')}</Text>
             <PrimaryButton
-              label="Ouvrir le Pokédex"
+              label={t('collection.openPokedex')}
               onPress={() => router.push('/pokedex')}
-              accessibilityLabel="Ouvrir le Pokédex"
-              accessibilityHint="Affiche la liste des Pokémon"
+              accessibilityLabel={t('home.pokedexCard.label')}
+              accessibilityHint={t('home.pokedexCard.hint')}
             />
           </StateView>
         ) : (
@@ -171,6 +171,8 @@ function CollectionSlot({
   /** Stored variant of this favorite, which is what the slot must show. */
   variant: SpriteVariant;
 }) {
+  const { t } = useTranslation();
+  const { name, cardLabel } = usePokemonText();
   // `Link asChild` hands the child to Radix's Slot, which merges styles with an
   // object spread: a style *function* or array would silently become `{}`. So
   // press state is tracked here and flattened into the single object Slot takes.
@@ -186,8 +188,8 @@ function CollectionSlot({
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         accessibilityRole="button"
-        accessibilityLabel={`${pokemon.names.fr}${isShiny ? ' shiny' : ''}, numéro ${formatDexNumber(pokemon.id)}, type ${pokemon.types.join(' et ')}`}
-        accessibilityHint="Ouvre la fiche détaillée du Pokémon"
+        accessibilityLabel={cardLabel(pokemon, isShiny)}
+        accessibilityHint={t('pokemon.openHint')}
         style={style}>
         {isShiny && (
           <View style={styles.shinyBadge}>
@@ -198,7 +200,7 @@ function CollectionSlot({
           <Image source={sprite} style={styles.slotArtwork} contentFit="contain" />
         )}
         <Text style={styles.slotName} numberOfLines={1}>
-          {pokemon.names.fr}
+          {name(pokemon)}
         </Text>
       </Pressable>
     </Link>

@@ -1,6 +1,8 @@
 import type {
   LanguageCode,
+  LocalizedNames,
   NationalDexId,
+  PokemonAbility,
   PokemonBatch,
   PokemonDetails,
   PokemonSprites,
@@ -8,6 +10,7 @@ import type {
   PokemonSummary,
   SpriteVariant,
 } from '@/types/pokemon';
+import { humanizeSlug } from '@/utils/pokemonList';
 
 export const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2';
 export const NATIONAL_DEX_MIN: NationalDexId = 1;
@@ -38,10 +41,17 @@ interface RawPokemon {
   stats: { base_stat: number; stat: { name: string } }[];
 }
 
+type RawLocalizedName = { name: string; language: { name: string } };
+
 /** Subset of the PokéAPI v2 `/pokemon-species/{id}` response that we actually read. */
 interface RawSpecies {
-  names: { name: string; language: { name: string } }[];
+  names: RawLocalizedName[];
   flavor_text_entries: { flavor_text: string; language: { name: string } }[];
+}
+
+/** Subset of the PokéAPI v2 `/ability/{name}` response that we actually read. */
+interface RawAbility {
+  names: RawLocalizedName[];
 }
 
 /** Explicit PokéAPI stat name → domain key mapping. */
@@ -77,15 +87,15 @@ export function resolveSprite(sprites: PokemonSprites, variant: SpriteVariant): 
   return variant === 'shiny' ? (sprites.shiny ?? sprites.normal) : sprites.normal;
 }
 
-function pickLocalizedName(species: RawSpecies, language: string): string | undefined {
-  return species.names.find((entry) => entry.language.name === language)?.name;
+function pickLocalizedName(names: readonly RawLocalizedName[], language: LanguageCode): string | undefined {
+  return names.find((entry) => entry.language.name === language)?.name;
 }
 
 function normalizePokemon(raw: RawPokemon, species: RawSpecies): PokemonSummary {
   const artwork = raw.sprites.other?.['official-artwork'];
   // Fall back en → apiName so a missing translation never breaks the UI.
-  const en = pickLocalizedName(species, 'en') ?? raw.name;
-  const fr = pickLocalizedName(species, 'fr') ?? en;
+  const en = pickLocalizedName(species.names, 'en') ?? raw.name;
+  const fr = pickLocalizedName(species.names, 'fr') ?? en;
   return {
     id: raw.id,
     apiName: raw.name,
@@ -116,32 +126,59 @@ function normalizeFlavorText(text: string): string {
     .trim();
 }
 
-function pickDescription(species: RawSpecies): Pick<PokemonDetails, 'description' | 'descriptionLanguage'> {
-  for (const language of ['fr', 'en'] as const satisfies readonly LanguageCode[]) {
+/**
+ * The latest usable flavor text in each language, picked independently: an
+ * entry that normalizes to nothing is skipped rather than shown blank.
+ */
+function pickDescriptions(species: RawSpecies): PokemonDetails['descriptions'] {
+  const pick = (language: LanguageCode): string | null => {
     // Entries are ordered by game version; the last one is the most recent wording.
-    const entries = species.flavor_text_entries.filter((entry) => entry.language.name === language);
-    const latest = entries.at(-1);
-    if (latest) {
-      return { description: normalizeFlavorText(latest.flavor_text), descriptionLanguage: language };
-    }
-  }
-  return { description: null, descriptionLanguage: null };
+    const texts = species.flavor_text_entries
+      .filter((entry) => entry.language.name === language)
+      .map((entry) => normalizeFlavorText(entry.flavor_text))
+      .filter((text) => text.length > 0);
+    return texts.at(-1) ?? null;
+  };
+  return { fr: pick('fr'), en: pick('en') };
 }
 
-function normalizeDetails(raw: RawPokemon, species: RawSpecies): PokemonDetails {
+/**
+ * Localized ability names, each falling back to the other language and then to
+ * the humanized slug, so a gap in PokéAPI never shows a raw `inner-focus`.
+ */
+function normalizeAbilityNames(apiName: string, raw: RawAbility | null): LocalizedNames {
+  const fr = raw === null ? undefined : pickLocalizedName(raw.names, 'fr');
+  const en = raw === null ? undefined : pickLocalizedName(raw.names, 'en');
+  const fallback = humanizeSlug(apiName);
+  return { fr: fr ?? en ?? fallback, en: en ?? fr ?? fallback };
+}
+
+function normalizeDetails(
+  raw: RawPokemon,
+  species: RawSpecies,
+  abilityNames: ReadonlyMap<string, LocalizedNames>,
+): PokemonDetails {
   return {
     ...normalizePokemon(raw, species),
     heightM: raw.height / 10,
     weightKg: raw.weight / 10,
-    abilities: [...raw.abilities]
-      .sort((a, b) => a.slot - b.slot)
-      .map((entry) => ({ name: entry.ability.name, isHidden: entry.is_hidden })),
+    abilities: sortedAbilities(raw).map(
+      (entry): PokemonAbility => ({
+        apiName: entry.ability.name,
+        names: abilityNames.get(entry.ability.name) ?? normalizeAbilityNames(entry.ability.name, null),
+        isHidden: entry.is_hidden,
+      }),
+    ),
     stats: normalizeStats(raw.stats),
-    ...pickDescription(species),
+    descriptions: pickDescriptions(species),
   };
 }
 
-async function getJson<T>(path: string, id: number): Promise<T> {
+function sortedAbilities(raw: RawPokemon): RawPokemon['abilities'] {
+  return [...raw.abilities].sort((a, b) => a.slot - b.slot);
+}
+
+async function getJson<T>(path: string, id: number | string): Promise<T> {
   const response = await fetch(`${POKEAPI_BASE_URL}/${path}/${id}`);
   if (!response.ok) {
     throw new PokeApiError(`PokéAPI request ${path}/${id} failed (${response.status}).`, response.status);
@@ -173,13 +210,60 @@ export async function fetchPokemonById(id: number): Promise<PokemonSummary> {
 }
 
 /**
- * Fetch the full detail model (summary + height/weight/abilities/stats/description).
+ * Per-session cache of localized ability names, keyed by canonical ability name.
+ * Many Pokémon share an ability (Chlorophyll, Intimidate…), so visiting the
+ * next one does not request `/ability/chlorophyll` again. The promise itself is
+ * cached, which also folds concurrent requests for the same ability into one.
+ * A failed request is evicted so a later visit can retry it. Memory only:
+ * nothing from PokéAPI is persisted.
+ */
+const abilityNamesCache = new Map<string, Promise<LocalizedNames>>();
+
+function fetchAbilityNames(apiName: string): Promise<LocalizedNames> {
+  const cached = abilityNamesCache.get(apiName);
+  if (cached !== undefined) return cached;
+  const request = getJson<RawAbility>('ability', encodeURIComponent(apiName)).then(
+    (raw) => normalizeAbilityNames(apiName, raw),
+    (error: unknown) => {
+      abilityNamesCache.delete(apiName);
+      throw error;
+    },
+  );
+  abilityNamesCache.set(apiName, request);
+  return request;
+}
+
+/**
+ * Localized names for every ability of `raw`. An ability whose resource cannot
+ * be loaded degrades to its humanized slug rather than failing the whole detail
+ * screen — the name is secondary information.
+ */
+async function loadAbilityNames(raw: RawPokemon): Promise<Map<string, LocalizedNames>> {
+  const names = sortedAbilities(raw).map((entry) => entry.ability.name);
+  const resolved = await Promise.all(
+    names.map((apiName) =>
+      fetchAbilityNames(apiName).catch(() => normalizeAbilityNames(apiName, null)),
+    ),
+  );
+  return new Map(names.map((apiName, index) => [apiName, resolved[index]]));
+}
+
+/**
+ * Fetch the full detail model (summary + height/weight/abilities/stats and both
+ * localized descriptions). Ability names in both languages are loaded here, up
+ * front, so switching language afterwards needs no request at all. The ability
+ * requests start as soon as `/pokemon/{id}` answers, alongside the species one.
  * Rejects IDs outside 1–251 without a network call.
  */
 export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   assertSupportedDexId(id);
-  const [raw, species] = await fetchRawPair(id);
-  return normalizeDetails(raw, species);
+  const rawRequest = getJson<RawPokemon>('pokemon', id);
+  const [raw, species, abilityNames] = await Promise.all([
+    rawRequest,
+    getJson<RawSpecies>('pokemon-species', id),
+    rawRequest.then(loadAbilityNames),
+  ]);
+  return normalizeDetails(raw, species, abilityNames);
 }
 
 export interface FetchPokemonBatchOptions {

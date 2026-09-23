@@ -2,14 +2,16 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { fetchPokemonById, resolveSprite } from '@/api/pokeApi';
+import { fetchPokemonById, NATIONAL_DEX_TOTAL, resolveSprite } from '@/api/pokeApi';
 import { PrimaryButton } from '@/components/Controls';
 import { PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
 import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor, withAlpha } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
+import { usePokemonText } from '@/i18n/pokemonText';
 import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { NationalDexId, PokemonSummary, SpriteVariant } from '@/types/pokemon';
@@ -18,10 +20,14 @@ import { formatDexNumber } from '@/utils/pokemonList';
 /** Shown as the hero while the collection is still empty. */
 const FALLBACK_HERO_ID: NationalDexId = 197;
 
-/** Outcome of the hero fetch, tagged with the id it was requested for. */
+/**
+ * Outcome of the hero fetch, tagged with the id it was requested for. An error
+ * keeps the technical message only; the fallback wording is translated at
+ * render time so it follows a language switch.
+ */
 type HeroResult =
   | { id: NationalDexId; status: 'success'; pokemon: PokemonSummary }
-  | { id: NationalDexId; status: 'error'; message: string };
+  | { id: NationalDexId; status: 'error'; message: string | null };
 
 /**
  * The stage the featured Pokémon stands on: a square area, with the soft disc
@@ -37,6 +43,8 @@ function pickRandom(ids: readonly NationalDexId[]): NationalDexId {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const { name, cardLabel } = usePokemonText();
   const { hydrated, favoriteIds, getFavorite } = useFavorites();
 
   const [heroId, setHeroId] = useState<NationalDexId | null>(null);
@@ -75,7 +83,7 @@ export default function HomeScreen() {
           setResult({
             id: requestedId,
             status: 'error',
-            message: error instanceof Error ? error.message : 'Erreur inconnue',
+            message: error instanceof Error ? error.message : null,
           });
         }
       });
@@ -114,11 +122,13 @@ export default function HomeScreen() {
   const heroSprite = state.status === 'success' ? resolveSprite(state.pokemon.sprites, heroVariant) : null;
   const accent = state.status === 'success' ? getTypeColor(state.pokemon.types[0]) : COLORS.medium;
 
-  const kicker = <Text style={styles.kicker}>{isFallbackHero ? 'Pokémon vedette' : 'Votre vedette'}</Text>;
+  const kicker = (
+    <Text style={styles.kicker}>{t(isFallbackHero ? 'home.kickerFallback' : 'home.kickerFavorite')}</Text>
+  );
 
   return (
     <PokedexScreen>
-      <PokedexHeader title="Pokédex" subtitle="Johto & Kanto · 251 Pokémon" />
+      <PokedexHeader title={t('home.title')} subtitle={t('home.subtitle', { count: NATIONAL_DEX_TOTAL })} />
 
       {/* Home is a screen inside the Pokédex, not a separate page: the white
           sheet is the room the featured Pokémon stands in, and the shortcuts
@@ -132,27 +142,23 @@ export default function HomeScreen() {
                 <ActivityIndicator color={COLORS.red} />
               </Stage>
               <Text style={MESSAGE.muted}>
-                {hydrated ? 'Chargement du Pokémon…' : 'Lecture de la collection…'}
+                {t(hydrated ? 'home.loadingHero' : 'common.readingCollection')}
               </Text>
             </View>
           ) : state.status === 'error' ? (
             <View style={styles.featured}>
               {kicker}
               <Stage />
-              <Text style={MESSAGE.error}>Impossible de charger la vedette.</Text>
-              <Text style={MESSAGE.muted}>{state.message}</Text>
-              <PrimaryButton
-                label="Réessayer"
-                onPress={retry}
-                accessibilityLabel="Réessayer de charger le Pokémon vedette"
-              />
+              <Text style={MESSAGE.error}>{t('home.heroError')}</Text>
+              <Text style={MESSAGE.muted}>{state.message ?? t('common.unknownError')}</Text>
+              <PrimaryButton label={t('common.retry')} onPress={retry} accessibilityLabel={t('home.heroRetryLabel')} />
             </View>
           ) : (
             <Pressable
               onPress={() => openHero(heroVariant)}
               accessibilityRole="button"
-              accessibilityLabel={`${state.pokemon.names.fr}${isShinyHero ? ' shiny' : ''}, numéro ${formatDexNumber(state.pokemon.id)}, type ${state.pokemon.types.join(' et ')}`}
-              accessibilityHint="Ouvre la fiche détaillée du Pokémon"
+              accessibilityLabel={cardLabel(state.pokemon, isShinyHero)}
+              accessibilityHint={t('pokemon.openHint')}
               style={({ pressed }) => [styles.featured, pressed && styles.pressed]}>
               {kicker}
               <Stage>
@@ -161,19 +167,19 @@ export default function HomeScreen() {
                     source={heroSprite}
                     style={styles.artwork}
                     contentFit="contain"
-                    accessibilityLabel={`Illustration de ${state.pokemon.names.fr}`}
+                    accessibilityLabel={t('pokemon.artwork', { name: name(state.pokemon) })}
                   />
                 )}
               </Stage>
               <Text style={styles.dexNumber}>{formatDexNumber(state.pokemon.id)}</Text>
-              <Text style={styles.name}>{state.pokemon.names.fr}</Text>
+              <Text style={styles.name}>{name(state.pokemon)}</Text>
               <View style={styles.types}>
                 {state.pokemon.types.map((type) => (
                   <TypeBadge key={type} type={type} />
                 ))}
               </View>
               <View style={styles.cta}>
-                <Text style={styles.ctaText}>Voir la fiche</Text>
+                <Text style={styles.ctaText}>{t('home.viewEntry')}</Text>
                 <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.red} />
               </View>
             </Pressable>
@@ -183,23 +189,23 @@ export default function HomeScreen() {
             <ActionCard
               accent={COLORS.red}
               icon="format-list-bulleted"
-              title="Pokédex"
-              subtitle="Rechercher, trier et filtrer"
-              value="251"
-              unit="Pokémon"
-              accessibilityLabel="Ouvrir le Pokédex"
-              accessibilityHint="Affiche la liste des Pokémon"
+              title={t('home.pokedexCard.title')}
+              subtitle={t('home.pokedexCard.subtitle')}
+              value={String(NATIONAL_DEX_TOTAL)}
+              unit={t('home.pokedexCard.unit')}
+              accessibilityLabel={t('home.pokedexCard.label')}
+              accessibilityHint={t('home.pokedexCard.hint')}
               onPress={() => router.push('/pokedex')}
             />
             <ActionCard
               accent={accent}
               icon="heart"
-              title="Collection"
-              subtitle="Vos Pokémon favoris"
+              title={t('home.collectionCard.title')}
+              subtitle={t('home.collectionCard.subtitle')}
               value={hydrated ? String(favoriteCount) : '…'}
-              unit={favoriteCount > 1 ? 'favoris' : 'favori'}
-              accessibilityLabel={`Ouvrir la collection, ${favoriteCount} Pokémon favori${favoriteCount > 1 ? 's' : ''}`}
-              accessibilityHint="Affiche vos Pokémon favoris"
+              unit={t('home.collectionCard.unit', { count: favoriteCount })}
+              accessibilityLabel={t('home.collectionCard.label', { count: favoriteCount })}
+              accessibilityHint={t('home.collectionCard.hint')}
               onPress={() => router.push('/collection')}
             />
           </View>

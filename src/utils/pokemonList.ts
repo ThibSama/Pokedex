@@ -1,4 +1,4 @@
-import type { PokemonSummary } from '@/types/pokemon';
+import type { LanguageCode, PokemonSummary } from '@/types/pokemon';
 
 export type SortMode = 'dex' | 'name';
 
@@ -6,7 +6,7 @@ export interface ListOptions {
   /** Free-text search; matches FR/EN names, apiName and Dex number. */
   query: string;
   sort: SortMode;
-  /** Type name to keep, or null for all. */
+  /** Canonical type slug to keep (e.g. `dark`), or null for all. Never a translated label. */
   type: string | null;
 }
 
@@ -34,6 +34,10 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+/**
+ * Matches both the French and the English name whatever the UI language, so
+ * "Noctali" still finds Umbreon in English. Purely local: nothing is fetched.
+ */
 export function matchesQuery(pokemon: PokemonSummary, query: string): boolean {
   const q = normalizeText(query);
   if (q === '') return true;
@@ -48,11 +52,22 @@ export function matchesQuery(pokemon: PokemonSummary, query: string): boolean {
   );
 }
 
-/** Returns a new sorted array; never mutates `items`. */
-export function sortPokemon(items: readonly PokemonSummary[], mode: SortMode): PokemonSummary[] {
+/** Collation locale per display language, for name sorting. */
+const COLLATION_LOCALES: Record<LanguageCode, string> = { fr: 'fr', en: 'en' };
+
+/**
+ * Returns a new sorted array; never mutates `items`. Name order follows the
+ * displayed name: `names.fr` with French collation, or `names.en` with English.
+ */
+export function sortPokemon(
+  items: readonly PokemonSummary[],
+  mode: SortMode,
+  language: LanguageCode,
+): PokemonSummary[] {
   const copy = [...items];
   if (mode === 'name') {
-    return copy.sort((a, b) => a.names.fr.localeCompare(b.names.fr, 'fr'));
+    const collator = new Intl.Collator(COLLATION_LOCALES[language]);
+    return copy.sort((a, b) => collator.compare(a.names[language], b.names[language]) || a.id - b.id);
   }
   return copy.sort((a, b) => a.id - b.id);
 }
@@ -61,11 +76,12 @@ export function sortPokemon(items: readonly PokemonSummary[], mode: SortMode): P
 export function applyListOptions(
   items: readonly PokemonSummary[],
   { query, sort, type }: ListOptions,
+  language: LanguageCode,
 ): PokemonSummary[] {
   const filtered = items.filter(
     (pokemon) => (type === null || pokemon.types.includes(type)) && matchesQuery(pokemon, query),
   );
-  return sortPokemon(filtered, sort);
+  return sortPokemon(filtered, sort, language);
 }
 
 /** Distinct type names present in `items`, alphabetically. */

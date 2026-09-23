@@ -1,8 +1,10 @@
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
+import { usePokemonText } from '@/i18n/pokemonText';
 import { COLORS, OPACITY, RADIUS, SHADOW } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
@@ -16,6 +18,8 @@ interface PokemonCardProps {
 
 /** The single grid tile used by both the Pokédex and the Collection. */
 export function PokemonCard({ pokemon, width }: PokemonCardProps) {
+  const { t } = useTranslation();
+  const { name, cardLabel } = usePokemonText();
   // `Link asChild` hands the child to Radix's Slot, which merges styles with
   // `{ ...slotStyle, ...childStyle }`. Spreading a style *function* — or an
   // array — into an object silently yields `{}`, dropping every style including
@@ -34,14 +38,14 @@ export function PokemonCard({ pokemon, width }: PokemonCardProps) {
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         accessibilityRole="button"
-        accessibilityLabel={`${pokemon.names.fr}, numéro ${formatDexNumber(pokemon.id)}, type ${pokemon.types.join(' et ')}`}
-        accessibilityHint="Ouvre la fiche détaillée du Pokémon"
+        accessibilityLabel={cardLabel(pokemon)}
+        accessibilityHint={t('pokemon.openHint')}
         style={style}>
         <Text style={styles.tileDexNumber}>{formatDexNumber(pokemon.id)}</Text>
         <Image source={pokemon.sprites.normal} style={styles.tileArtwork} contentFit="contain" />
         <View style={styles.tileFooter}>
           <Text style={styles.tileName} numberOfLines={1}>
-            {pokemon.names.fr}
+            {name(pokemon)}
           </Text>
         </View>
       </Pressable>

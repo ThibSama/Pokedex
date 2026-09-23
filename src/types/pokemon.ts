@@ -7,17 +7,20 @@ export interface PokemonSummary {
   id: NationalDexId;
   /** Canonical PokéAPI resource name, e.g. "umbreon". */
   apiName: string;
-  /** Localized display names from PokéAPI species data. French is the default UI name. */
+  /** Localized display names from PokéAPI species data; the UI shows the active language's. */
   names: PokemonNames;
   sprites: PokemonSprites;
   /** Type names ordered by PokéAPI slot (primary first), e.g. ["grass", "poison"]. */
   types: string[];
 }
 
-export interface PokemonNames {
-  fr: string;
-  en: string;
-}
+/** Supported application / content languages. */
+export type LanguageCode = 'fr' | 'en';
+
+/** One display string per supported language, always present (fallbacks resolved at normalization). */
+export type LocalizedNames = Record<LanguageCode, string>;
+
+export type PokemonNames = LocalizedNames;
 
 export interface PokemonSprites {
   /** Normal artwork URL, or null when PokéAPI has none. */
@@ -49,8 +52,6 @@ export interface PokemonBatch {
   hasMore: boolean;
 }
 
-export type LanguageCode = 'fr' | 'en';
-
 /** Six base stats, keyed explicitly (never by PokéAPI array position). */
 export interface PokemonStats {
   hp: number;
@@ -62,8 +63,10 @@ export interface PokemonStats {
 }
 
 export interface PokemonAbility {
-  /** PokéAPI ability name, e.g. "inner-focus". */
-  name: string;
+  /** Canonical PokéAPI ability name, e.g. "inner-focus". Never shown verbatim. */
+  apiName: string;
+  /** Localized names from `/ability/{name}`, with fallbacks already applied. */
+  names: LocalizedNames;
   isHidden: boolean;
 }
 
@@ -76,8 +79,10 @@ export interface PokemonDetails extends PokemonSummary {
   /** Abilities ordered by PokéAPI slot. */
   abilities: PokemonAbility[];
   stats: PokemonStats;
-  /** Species flavor text with whitespace normalized, or null if none exists in fr/en. */
-  description: string | null;
-  /** Language of `description`: French preferred, English fallback. */
-  descriptionLanguage: LanguageCode | null;
+  /**
+   * Latest species flavor text per language, whitespace normalized, or null when
+   * PokéAPI has none in that language. Both are loaded up front so switching
+   * language never refetches.
+   */
+  descriptions: Record<LanguageCode, string | null>;
 }
