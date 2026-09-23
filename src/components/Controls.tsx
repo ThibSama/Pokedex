@@ -1,9 +1,10 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { ComponentProps, ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { accentOn, foregroundOn, MIN_CONTRAST } from '@/theme/contrast';
-import { COLORS, OPACITY, RADIUS, SPACING } from '@/theme/tokens';
+import { createThemedStyles, useTheme } from '@/theme/ThemeProvider';
+import { OPACITY, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 
 /**
@@ -41,6 +42,7 @@ export function PrimaryButton({
   accessibilityHint,
   style,
 }: PrimaryButtonProps) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -69,8 +71,8 @@ interface IconButtonProps {
 
 /**
  * A compact secondary action: round, 28px, accent-filled while active. The
- * glyph is a darker shade of the accent when idle (3:1 on its grey disc) and
- * white or dark on the accent fill when active.
+ * glyph is a readable shade of the accent when idle (3:1 on its muted disc, in
+ * either theme) and white or dark on the accent fill when active.
  */
 export function IconButton({
   icon,
@@ -81,6 +83,8 @@ export function IconButton({
   accessibilityLabel,
   busy,
 }: IconButtonProps) {
+  const styles = useStyles();
+  const { palette } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -94,7 +98,7 @@ export function IconButton({
       <MaterialCommunityIcons
         name={icon}
         size={ICON_SIZE}
-        color={active ? foregroundOn(accent) : accentOn(accent, COLORS.background, MIN_CONTRAST.graphic)}
+        color={active ? foregroundOn(accent) : accentOn(accent, palette.surfaceMuted, MIN_CONTRAST.graphic)}
       />
     </Pressable>
   );
@@ -107,6 +111,7 @@ export function IconButton({
  * indicator, and nothing is re-announced while data keeps arriving.
  */
 export function StateView({ children, announce }: { children: ReactNode; announce?: 'alert' | 'status' }) {
+  const styles = useStyles();
   return (
     <View
       style={styles.stateView}
@@ -117,17 +122,17 @@ export function StateView({ children, announce }: { children: ReactNode; announc
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   primaryButton: {
     minHeight: 40,
     justifyContent: 'center',
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.red,
+    backgroundColor: c.chrome,
   },
   primaryButtonText: {
     ...TYPO.subtitle2,
-    color: COLORS.white,
+    color: c.onChrome,
   },
   iconButton: {
     width: ICON_BUTTON_SIZE,
@@ -135,7 +140,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.chip,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
   },
   stateView: {
     flex: 1,
@@ -150,4 +155,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: OPACITY.disabled,
   },
-});
+}));

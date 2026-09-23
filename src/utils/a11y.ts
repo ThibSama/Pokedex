@@ -22,6 +22,18 @@ export function choiceProps(selected: boolean): AccessibilityProps {
 }
 
 /**
+ * An on/off setting, e.g. the Dark theme. On web a toggle button
+ * (`aria-pressed`), which react-native-web activates with Enter and Space alike
+ * — it gives Space to `role="button"` only; on native a switch in the `checked`
+ * state. `aria-pressed` is web-only, hence the cast.
+ */
+export function toggleProps(on: boolean): AccessibilityProps {
+  return Platform.OS === 'web'
+    ? ({ role: 'button', 'aria-pressed': on } as AccessibilityProps)
+    : { role: 'switch', 'aria-checked': on };
+}
+
+/**
  * Hides a decorative icon or glyph from screen readers. React Native maps it to
  * `accessibilityElementsHidden` on iOS and `no-hide-descendants` on Android.
  */

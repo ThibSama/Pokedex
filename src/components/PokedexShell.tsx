@@ -2,14 +2,15 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router, Stack } from 'expo-router';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { changeAppLanguage, useAppLanguage } from '@/i18n';
 import { APP_LANGUAGES } from '@/i18n/languages';
-import { COLORS, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
+import { createThemedStyles, ThemeFade, useTheme } from '@/theme/ThemeProvider';
+import { BRAND, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
-import { choiceProps, DECORATIVE } from '@/utils/a11y';
+import { choiceProps, DECORATIVE, toggleProps } from '@/utils/a11y';
 
 /**
  * The Pokédex shell: the red chrome, the header band and the white content sheet
@@ -23,13 +24,15 @@ const BACK_BUTTON_SIZE = 28;
 const BACK_HIT_SLOP = 8;
 
 /**
- * Native touch targets for the 28x24 FR/EN options: 44 tall, and as wide as the
- * 2px gap between them allows without the two slops overlapping.
+ * Native touch targets for the 28x24 FR/EN options and the theme switch that
+ * shares their track: 44 tall, and as wide as the 2px gaps between them allow
+ * without two slops overlapping.
  */
 const LANGUAGE_HIT_SLOP = [
   { top: 10, bottom: 10, left: 8, right: 1 },
-  { top: 10, bottom: 10, left: 1, right: 8 },
+  { top: 10, bottom: 10, left: 1, right: 1 },
 ];
+const THEME_HIT_SLOP = { top: 10, bottom: 10, left: 1, right: 8 };
 
 /**
  * Returns to the previous screen, or to `fallback` when this screen was opened
@@ -46,6 +49,7 @@ export function goBack(fallback: '/' | '/pokedex' = '/') {
  * route as headerless: every screen paints this chrome instead of a native one.
  */
 export function PokedexScreen({ children }: { children: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -69,12 +73,13 @@ interface PokedexHeaderProps {
 
 /**
  * The application header: back affordance, Pokéball brand mark, bold Poppins
- * title, an optional right-aligned accessory, the app-wide language switch, and
- * whatever control rows the screen adds as children.
+ * title, an optional right-aligned accessory, the app-wide language and theme
+ * switches, and whatever control rows the screen adds as children.
  */
 export function PokedexHeader({ title, subtitle, trailing, onBack, children }: PokedexHeaderProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
   const hasBack = onBack !== undefined;
 
   return (
@@ -87,10 +92,10 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
             role="button"
             accessibilityLabel={t('shell.back')}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.white} {...DECORATIVE} />
+            <MaterialCommunityIcons name="chevron-left" size={28} color={BRAND.white} {...DECORATIVE} />
           </Pressable>
         )}
-        <MaterialCommunityIcons name="pokeball" size={24} color={COLORS.white} {...DECORATIVE} />
+        <MaterialCommunityIcons name="pokeball" size={24} color={BRAND.white} {...DECORATIVE} />
         <View style={styles.titleBlock}>
           <Text style={styles.title} numberOfLines={1} role="heading">
             {title}
@@ -98,7 +103,11 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
           {subtitle !== undefined && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
         {trailing !== undefined && <Text style={styles.trailing}>{trailing}</Text>}
-        <LanguageSwitch />
+        {/* One compact track for both app-wide settings, so the title keeps its room. */}
+        <View style={styles.settings}>
+          <LanguageSwitch />
+          <ThemeSwitch />
+        </View>
       </View>
       {children}
     </View>
@@ -113,6 +122,7 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
 function LanguageSwitch() {
   const { t } = useTranslation();
   const language = useAppLanguage();
+  const styles = useStyles();
 
   return (
     <View style={styles.language} role="group" aria-label={t('language.label')}>
@@ -141,6 +151,38 @@ function LanguageSwitch() {
   );
 }
 
+/**
+ * The Light/Dark switch, on the language track right after EN: a sun on the red
+ * in Light, a red moon on a white chip in Dark. Like the language, it applies in
+ * place — no navigation, no refetch — and is persisted for the next launch.
+ */
+function ThemeSwitch() {
+  const { t } = useTranslation();
+  const { mode, setMode } = useTheme();
+  const styles = useStyles();
+  const dark = mode === 'dark';
+
+  return (
+    <Pressable
+      onPress={() => setMode(dark ? 'light' : 'dark')}
+      hitSlop={THEME_HIT_SLOP}
+      {...toggleProps(dark)}
+      accessibilityLabel={t('theme.dark')}
+      style={({ pressed }) => [
+        styles.languageOption,
+        dark && styles.languageOptionSelected,
+        pressed && styles.pressed,
+      ]}>
+      <MaterialCommunityIcons
+        name={dark ? 'weather-night' : 'white-balance-sunny'}
+        size={16}
+        color={dark ? BRAND.red : BRAND.white}
+        {...DECORATIVE}
+      />
+    </Pressable>
+  );
+}
+
 interface PokedexSurfaceProps {
   /**
    * `sheet` is the route's content sheet: it fills the chrome below the header,
@@ -154,17 +196,24 @@ interface PokedexSurfaceProps {
   children: ReactNode;
 }
 
-/** The white rounded content surface: everything readable sits on one of these. */
+/**
+ * The rounded content surface — white in Light, near-black in Dark: everything
+ * readable sits on one of these, so it also carries the theme crossfade.
+ */
 export function PokedexSurface({ variant = 'sheet', style, children }: PokedexSurfaceProps) {
+  const styles = useStyles();
   return (
-    <View style={[styles.surface, variant === 'sheet' && styles.sheet, style]}>{children}</View>
+    <View style={[styles.surface, variant === 'sheet' && styles.sheet, style]}>
+      {children}
+      <ThemeFade borderRadius={RADIUS.sheet} />
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.red,
+    backgroundColor: c.chrome,
   },
   header: {
     paddingBottom: SPACING.md,
@@ -196,24 +245,29 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TYPO.headline,
-    color: COLORS.white,
+    color: c.onChrome,
   },
   subtitle: {
     ...TYPO.body2,
-    color: COLORS.white,
+    color: c.onChrome,
   },
   trailing: {
     ...TYPO.subtitle2,
-    color: COLORS.white,
+    color: c.onChrome,
     fontVariant: ['tabular-nums'],
   },
-  language: {
+  settings: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
     padding: 2,
     borderRadius: RADIUS.pill,
     backgroundColor: OVERLAY.fill,
+  },
+  language: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   languageOption: {
     // 24 is the WCAG 2.2 minimum target on web, where hitSlop does not apply;
@@ -226,17 +280,17 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   languageOptionSelected: {
-    backgroundColor: COLORS.white,
+    backgroundColor: BRAND.white,
   },
   languageText: {
     ...TYPO.subtitle3,
-    color: COLORS.white,
+    color: c.onChrome,
   },
   languageTextSelected: {
-    color: COLORS.red,
+    color: BRAND.red,
   },
   surface: {
-    backgroundColor: COLORS.white,
+    backgroundColor: c.surface,
     borderRadius: RADIUS.sheet,
     paddingTop: SHELL.sheetPadding,
   },
@@ -248,4 +302,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: OPACITY.pressed,
   },
-});
+}));

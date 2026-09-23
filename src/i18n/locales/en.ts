@@ -15,6 +15,9 @@ const en: LocaleResource = {
       en: "English",
     },
   },
+  theme: {
+    dark: "Dark mode",
+  },
   shell: {
     back: "Go back to the previous screen",
   },

@@ -1,10 +1,10 @@
-import { COLORS } from '@/theme/tokens';
+import { INK, PALETTES } from '@/theme/tokens';
 
 /**
  * WCAG 2.x contrast math, so readable text and meaningful icons are derived
  * from the canonical colors instead of hand-picked per screen. The 18 type
  * colors stay the Figma palette: only the foreground painted on them — or, for
- * type-colored text, a darker shade of the same hue — is computed here.
+ * type-colored text, a readable shade of the same hue — is computed here.
  */
 
 /** WCAG AA minimum contrast ratios. */
@@ -48,20 +48,22 @@ export function contrastRatio(a: string, b: string): number {
  * text color otherwise. Every type color reaches 4.5:1 with one of the two.
  */
 export function foregroundOn(fill: string): string {
-  if (contrastRatio(COLORS.white, fill) >= MIN_CONTRAST.text) return COLORS.white;
-  return contrastRatio(COLORS.dark, fill) >= contrastRatio(COLORS.white, fill) ? COLORS.dark : COLORS.white;
+  if (contrastRatio(INK.light, fill) >= MIN_CONTRAST.text) return INK.light;
+  return contrastRatio(INK.dark, fill) >= contrastRatio(INK.light, fill) ? INK.dark : INK.light;
 }
 
 const accentCache = new Map<string, string>();
 
 /**
  * `accent` when it already reads on `background` at `minRatio`, otherwise the
- * same hue darkened just enough to. For type-colored text and icons; decorative
- * accents (borders, bar fills, tinted tracks) keep the canonical color.
+ * same hue shifted just enough to: darkened on a light surface, lightened on a
+ * dark one, so a Dark sheet never gets dark-on-dark text. For type-colored text
+ * and icons; decorative accents (borders, bar fills, tinted tracks) keep the
+ * canonical color.
  */
 export function accentOn(
   accent: string,
-  background: string = COLORS.white,
+  background: string = PALETTES.light.surface,
   minRatio: number = MIN_CONTRAST.text,
 ): string {
   const key = `${accent}|${background}|${minRatio}`;
@@ -69,11 +71,13 @@ export function accentOn(
   if (cached !== undefined) return cached;
 
   const rgb = channels(accent);
+  // Toward whichever end has more room: black on the light surfaces, white on the dark ones.
+  const target = contrastRatio(background, '#000000') >= contrastRatio(background, '#FFFFFF') ? 0 : 255;
   let result = accent;
-  // Mixing toward black in 5% steps keeps the hue recognizable and always
-  // terminates: black itself clears every threshold on the app's light surfaces.
+  // Mixing in 5% steps keeps the hue recognizable and always terminates: the
+  // end color itself clears every threshold on the app's surfaces.
   for (let step = 0; step <= 20 && contrastRatio(result, background) < minRatio; step += 1) {
-    result = toHex(rgb.map((c) => c * (1 - step / 20)));
+    result = toHex(rgb.map((c) => c + (target - c) * (step / 20)));
   }
   accentCache.set(key, result);
   return result;

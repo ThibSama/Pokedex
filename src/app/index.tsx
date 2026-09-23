@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -34,14 +33,9 @@ import { getTypeColor, withAlpha } from "@/constants/typeColors";
 import { useFavorites } from "@/favorites/FavoritesProvider";
 import { usePokemonText } from "@/i18n/pokemonText";
 import { accentOn, MIN_CONTRAST } from "@/theme/contrast";
-import {
-  COLORS,
-  MESSAGE,
-  OPACITY,
-  OVERLAY,
-  RADIUS,
-  SPACING,
-} from "@/theme/tokens";
+import { useMessageStyles } from "@/theme/messages";
+import { createThemedStyles, useTheme } from "@/theme/ThemeProvider";
+import { BRAND, OPACITY, OVERLAY, RADIUS, SPACING } from "@/theme/tokens";
 import { TYPO } from "@/theme/typography";
 import type {
   NationalDexId,
@@ -82,6 +76,9 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { name, cardLabel } = usePokemonText();
   const { hydrated, favoriteIds, getFavorite } = useFavorites();
+  const styles = useStyles();
+  const message = useMessageStyles();
+  const { palette } = useTheme();
 
   const [heroId, setHeroId] = useState<NationalDexId | null>(null);
   const [result, setResult] = useState<HeroResult | null>(null);
@@ -164,7 +161,7 @@ export default function HomeScreen() {
   const accent =
     state.status === "success"
       ? getTypeColor(state.pokemon.types[0])
-      : COLORS.medium;
+      : palette.textMuted;
 
   return (
     <PokedexScreen>
@@ -183,17 +180,17 @@ export default function HomeScreen() {
           {!hydrated || state.status === "loading" ? (
             <View style={styles.featured}>
               <Stage>
-                <ActivityIndicator color={COLORS.red} />
+                <ActivityIndicator color={palette.accent} />
               </Stage>
-              <Text style={MESSAGE.muted}>
+              <Text style={message.muted}>
                 {t(hydrated ? "home.loadingHero" : "common.readingCollection")}
               </Text>
             </View>
           ) : state.status === "error" ? (
             <View style={styles.featured} role="alert">
               <Stage />
-              <Text style={MESSAGE.error}>{t("home.heroError")}</Text>
-              <Text style={MESSAGE.muted}>
+              <Text style={message.error}>{t("home.heroError")}</Text>
+              <Text style={message.muted}>
                 {state.message ?? t("common.unknownError")}
               </Text>
               <PrimaryButton
@@ -237,7 +234,7 @@ export default function HomeScreen() {
                 <MaterialCommunityIcons
                   name="chevron-right"
                   size={16}
-                  color={COLORS.red}
+                  color={palette.accent}
                   {...DECORATIVE}
                 />
               </View>
@@ -246,7 +243,7 @@ export default function HomeScreen() {
 
           <View style={styles.actions}>
             <ActionCard
-              accent={COLORS.red}
+              accent={BRAND.red}
               icon="format-list-bulleted"
               title={t("home.pokedexCard.title")}
               subtitle={t("home.pokedexCard.subtitle")}
@@ -283,6 +280,7 @@ export default function HomeScreen() {
  * present in the room rather than contained by a card.
  */
 function Stage({ children }: { children?: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.stage}>
       <View style={styles.disc} pointerEvents="none">
@@ -326,6 +324,8 @@ function ActionCard({
   accessibilityHint: string;
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const { palette } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -358,7 +358,7 @@ function ActionCard({
             {
               color: accentOn(
                 accent,
-                COLORS.background,
+                palette.surfaceMuted,
                 MIN_CONTRAST.largeText,
               ),
             },
@@ -371,7 +371,7 @@ function ActionCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   content: {
     padding: SPACING.lg,
     gap: SPACING.lg,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     right: STAGE_MARGIN,
     bottom: STAGE_MARGIN,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
     overflow: "hidden",
   },
   discWatermark: {
@@ -408,12 +408,12 @@ const styles = StyleSheet.create({
   },
   dexNumber: {
     ...TYPO.subtitle2,
-    color: COLORS.medium,
+    color: c.textMuted,
     fontVariant: ["tabular-nums"],
   },
   name: {
     ...TYPO.headline,
-    color: COLORS.dark,
+    color: c.text,
   },
   types: {
     flexDirection: "row",
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     ...TYPO.subtitle2,
-    color: COLORS.red,
+    color: c.accent,
   },
   actions: {
     flexDirection: "row",
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
     borderRadius: RADIUS.card,
     // A thick accent edge is what keeps the two tiles telling themselves apart.
     borderTopWidth: 4,
@@ -455,11 +455,11 @@ const styles = StyleSheet.create({
     ...TYPO.subtitle1,
     fontSize: 16,
     lineHeight: 20,
-    color: COLORS.dark,
+    color: c.text,
   },
   actionSubtitle: {
     ...TYPO.body3,
-    color: COLORS.medium,
+    color: c.textMuted,
   },
   actionMetric: {
     flexDirection: "row",
@@ -473,9 +473,9 @@ const styles = StyleSheet.create({
   },
   actionUnit: {
     ...TYPO.body3,
-    color: COLORS.medium,
+    color: c.textMuted,
   },
   pressed: {
     opacity: OPACITY.pressed,
   },
-});
+}));

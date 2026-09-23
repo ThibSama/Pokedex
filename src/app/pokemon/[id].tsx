@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import {
   fetchPokemonDetails,
@@ -21,7 +21,9 @@ import { getTypeColor } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
 import { formatDecimal, pickLocalized, usePokemonText } from '@/i18n/pokemonText';
 import { accentOn, foregroundOn } from '@/theme/contrast';
-import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
+import { useMessageStyles } from '@/theme/messages';
+import { createThemedStyles, useTheme } from '@/theme/ThemeProvider';
+import { OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { PokemonDetails, PokemonStats, SpriteVariant } from '@/types/pokemon';
 import { choiceProps, DECORATIVE, SECTION_HEADING } from '@/utils/a11y';
@@ -84,6 +86,9 @@ export default function PokemonDetailScreen() {
   const { language, name: displayName } = usePokemonText();
 
   const { hydrated, isFavorite, toggleFavorite } = useFavorites();
+  const styles = useStyles();
+  const message = useMessageStyles();
+  const { palette } = useTheme();
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -115,7 +120,7 @@ export default function PokemonDetailScreen() {
     setAttempt((n) => n + 1);
   }
 
-  const accent = state.status === 'success' ? getTypeColor(state.details.types[0]) : COLORS.medium;
+  const accent = state.status === 'success' ? getTypeColor(state.details.types[0]) : palette.textMuted;
 
   if (id === null) {
     return (
@@ -123,8 +128,8 @@ export default function PokemonDetailScreen() {
         <PokedexHeader title={t('detail.fallbackTitle')} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
           <StateView announce="alert">
-            <Text style={MESSAGE.error}>{t('detail.invalidId')}</Text>
-            <Text style={MESSAGE.muted}>
+            <Text style={message.error}>{t('detail.invalidId')}</Text>
+            <Text style={message.muted}>
               {t('detail.invalidIdBody', { value: String(idParam), min: NATIONAL_DEX_MIN, max: NATIONAL_DEX_MAX })}
             </Text>
           </StateView>
@@ -139,8 +144,8 @@ export default function PokemonDetailScreen() {
         <PokedexHeader title={t('detail.fallbackTitle')} trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
           <StateView>
-            <ActivityIndicator color={COLORS.red} />
-            <Text style={MESSAGE.muted}>{t('detail.loading', { number: formatDexNumber(id) })}</Text>
+            <ActivityIndicator color={palette.accent} />
+            <Text style={message.muted}>{t('detail.loading', { number: formatDexNumber(id) })}</Text>
           </StateView>
         </PokedexSurface>
       </PokedexScreen>
@@ -153,8 +158,8 @@ export default function PokemonDetailScreen() {
         <PokedexHeader title={t('detail.fallbackTitle')} trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
           <StateView announce="alert">
-            <Text style={MESSAGE.error}>{t('detail.loadError', { number: formatDexNumber(id) })}</Text>
-            <Text style={MESSAGE.muted}>{state.message ?? t('common.unknownError')}</Text>
+            <Text style={message.error}>{t('detail.loadError', { number: formatDexNumber(id) })}</Text>
+            <Text style={message.muted}>{state.message ?? t('common.unknownError')}</Text>
             <PrimaryButton label={t('common.retry')} onPress={retry} />
           </StateView>
         </PokedexSurface>
@@ -180,8 +185,8 @@ export default function PokemonDetailScreen() {
   );
   const variantLabel = t(`detail.variant.${effectiveVariant}`);
   // Type-colored headings are 16px bold — body-size text — so they take a
-  // shade of the accent that reaches 4.5:1 on the white card.
-  const accentText = accentOn(accent);
+  // shade of the accent that reaches 4.5:1 on the card, in either theme.
+  const accentText = accentOn(accent, palette.surface);
   const onAccent = foregroundOn(accent);
 
   return (
@@ -218,7 +223,7 @@ export default function PokemonDetailScreen() {
               />
             ) : (
               <View style={[styles.artwork, styles.artworkMissing]}>
-                <Text style={[MESSAGE.onColor, { color: onAccent }]}>{t('detail.noArtwork')}</Text>
+                <Text style={[message.onColor, { color: onAccent }]}>{t('detail.noArtwork')}</Text>
               </View>
             )}
             <HeroChevron direction="next" currentId={details.id} color={onAccent} />
@@ -322,6 +327,7 @@ function HeroChevron({
   color: string;
 }) {
   const { t } = useTranslation();
+  const styles = useStyles();
   const targetId = direction === 'previous' ? currentId - 1 : currentId + 1;
   if (!isSupportedDexId(targetId)) return <View style={styles.chevron} />;
   return (
@@ -358,6 +364,7 @@ function Segmented<T extends string>({
   accessibilityLabel: string;
 }) {
   const { t } = useTranslation();
+  const styles = useStyles();
   return (
     <View style={styles.segmented} role="group" aria-label={accessibilityLabel}>
       {options.map((option, index) => {
@@ -396,13 +403,15 @@ function AboutColumn({
   icon?: 'weight-kilogram' | 'ruler';
   lines: string[];
 }) {
+  const styles = useStyles();
+  const { palette } = useTheme();
   return (
     <View style={styles.aboutColumn}>
       <View style={styles.aboutValues}>
         {lines.map((line) => (
           <View key={line} style={styles.aboutValueRow}>
             {icon !== undefined && (
-              <MaterialCommunityIcons name={icon} size={14} color={COLORS.dark} {...DECORATIVE} />
+              <MaterialCommunityIcons name={icon} size={14} color={palette.text} {...DECORATIVE} />
             )}
             <Text style={styles.aboutValue}>{line}</Text>
           </View>
@@ -413,7 +422,7 @@ function AboutColumn({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   // `flexGrow` (not `flex`) so the card fills a short viewport but still grows with content.
   content: {
     flexGrow: 1,
@@ -491,7 +500,7 @@ const styles = StyleSheet.create({
     gap: 2,
     padding: 2,
     borderRadius: RADIUS.card,
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
   },
   segment: {
     // min-: grows with a larger text size instead of clipping the label.
@@ -503,7 +512,7 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     ...TYPO.body3,
-    color: COLORS.medium,
+    color: c.textMuted,
   },
   segmentTextSelected: {
     ...TYPO.subtitle3,
@@ -530,7 +539,7 @@ const styles = StyleSheet.create({
   },
   aboutDivider: {
     width: 1,
-    backgroundColor: COLORS.light,
+    backgroundColor: c.divider,
   },
   aboutValues: {
     flex: 1,
@@ -544,16 +553,16 @@ const styles = StyleSheet.create({
   },
   aboutValue: {
     ...TYPO.body2,
-    color: COLORS.dark,
+    color: c.text,
     textAlign: 'center',
   },
   aboutLabel: {
     ...TYPO.caption,
-    color: COLORS.medium,
+    color: c.textMuted,
   },
   description: {
     ...TYPO.body2,
-    color: COLORS.dark,
+    color: c.text,
   },
   stats: {
     gap: SPACING.md,
@@ -570,4 +579,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: OPACITY.pressed,
   },
-});
+}));

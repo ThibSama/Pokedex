@@ -1,30 +1,99 @@
-import type { TextStyle, ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
 
 import { withAlpha } from '@/constants/typeColors';
-import { TYPO } from '@/theme/typography';
 
 /**
  * The application's visual tokens: one small set of values every screen draws
  * from, so Home, Pokédex, Collection and the detail screen read as one product.
  *
- * Deliberately not a theming framework — there is one build, one palette and
- * one font family. Each value below is already in use somewhere in the app; a
- * value that stops being used should be deleted rather than kept "for later".
+ * Deliberately not a theming framework — there is one build, a Light and a
+ * Dark palette with the same semantic keys, and one font family. Each value
+ * below is already in use somewhere in the app; a value that stops being used
+ * should be deleted rather than kept "for later".
  */
 
-/** Figma neutrals plus the Pokédex brand red. The only place these literals exist. */
-export const COLORS = {
+export type ThemeMode = 'light' | 'dark';
+
+/** The two colors that never change with the theme: the Pokédex chrome and the white painted on it. */
+export const BRAND = {
   /** Pokédex red: every route's chrome, and the app's primary action color. */
   red: '#DC0A2D',
   white: '#FFFFFF',
-  /** Page background, and the light surface inside the white sheet. */
-  background: '#EFEFEF',
+} as const;
+
+/**
+ * Semantic colors for one theme. Screens read these through the theme
+ * (`useTheme`, `createThemedStyles`) — never a hex literal of their own — so a
+ * surface or a text color is decided once for Light and once for Dark.
+ */
+export interface Palette {
+  /** Every route's chrome and the primary action fill. Brand red in both themes. */
+  chrome: string;
+  /** Text and glyphs painted on the chrome or on a primary action. */
+  onChrome: string;
+  /** The content sheets every route is framed in. */
+  surface: string;
+  /** Tiles on a sheet, controls floating on the chrome, the filter panel. */
+  card: string;
+  /** Light fill inside a sheet or a tile: name bands, chips, discs, dashboard tiles. */
+  surfaceMuted: string;
   /** Dividers and hairlines. */
-  light: '#E0E0E0',
-  /** Secondary text. */
-  medium: '#666666',
+  divider: string;
   /** Primary text. */
-  dark: '#212121',
+  text: string;
+  /** Secondary text. */
+  textMuted: string;
+  /** Brand red as text or a glyph on a sheet: errors, spinners, the idle sort icons. */
+  accent: string;
+  /** Web only: the viewport around the centered app column, and the column itself. */
+  backdrop: string;
+  frame: string;
+}
+
+/**
+ * Light is the Figma palette, unchanged. Dark keeps the red chrome and every
+ * type color, and moves the sheets to a near-black with slightly lighter tiles
+ * and fields. Text contrast (WCAG AA): off-white text reaches 12.3:1 on the
+ * lightest dark fill, secondary text 6.0:1, the lifted red 5.2:1.
+ */
+export const PALETTES: Record<ThemeMode, Palette> = {
+  light: {
+    chrome: BRAND.red,
+    onChrome: BRAND.white,
+    surface: '#FFFFFF',
+    card: '#FFFFFF',
+    surfaceMuted: '#EFEFEF',
+    divider: '#E0E0E0',
+    text: '#212121',
+    textMuted: '#666666',
+    accent: BRAND.red,
+    backdrop: '#E0E0E0',
+    frame: '#EFEFEF',
+  },
+  dark: {
+    chrome: BRAND.red,
+    onChrome: BRAND.white,
+    surface: '#121212',
+    card: '#1E1E1E',
+    surfaceMuted: '#2A2A2A',
+    divider: '#3A3A3A',
+    text: '#EDEDED',
+    textMuted: '#A8A8A8',
+    // Brand red reads 3.7:1 on the dark sheet; this lift of it reaches 4.5:1 on every dark fill.
+    accent: '#FF6B7D',
+    backdrop: '#0A0A0A',
+    frame: '#121212',
+  },
+};
+
+/**
+ * The two inks for content painted on a solid accent (type colors, the chrome):
+ * white, or the Light theme's dark text. They are theme-independent because
+ * the accent under them is.
+ */
+export const INK = {
+  light: BRAND.white,
+  dark: PALETTES.light.text,
 } as const;
 
 /**
@@ -34,9 +103,9 @@ export const COLORS = {
  */
 export const OVERLAY = {
   /** Track behind white text on the red chrome (the language switch). 20% gave 4.2:1; 12% gives 4.6:1. */
-  fill: withAlpha(COLORS.white, 0.12),
+  fill: withAlpha(BRAND.white, 0.12),
   /** The oversized Pokéball watermark behind a hero. Decorative. */
-  watermark: withAlpha(COLORS.white, 0.12),
+  watermark: withAlpha(BRAND.white, 0.12),
 } as const;
 
 /** Corner radii. */
@@ -106,17 +175,3 @@ export const SHADOW = {
     shadowOffset: { width: 0, height: 0 },
   },
 } as const satisfies Record<string, ViewStyle>;
-
-/**
- * Message text for a screen's loading, empty and error states. They used to be
- * redeclared per route, which is how three screens grew three slightly
- * different "something failed" styles.
- */
-export const MESSAGE = {
-  /** Neutral explanation under a state's title. */
-  muted: { ...TYPO.body2, color: COLORS.medium, textAlign: 'center' },
-  /** The failure itself: red, because red is the app's signal color. */
-  error: { ...TYPO.subtitle1, color: COLORS.red, textAlign: 'center' },
-  /** Explanation painted on a type accent; the color comes from `foregroundOn(accent)`. */
-  onColor: { ...TYPO.body2, textAlign: 'center' },
-} as const satisfies Record<string, TextStyle>;

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -10,7 +10,8 @@ import Animated, {
 
 import { withAlpha } from '@/constants/typeColors';
 import { accentOn } from '@/theme/contrast';
-import { COLORS, RADIUS, SPACING } from '@/theme/tokens';
+import { createThemedStyles, useTheme } from '@/theme/ThemeProvider';
+import { RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import { summaryProps } from '@/utils/a11y';
 
@@ -39,6 +40,8 @@ interface StatBarProps {
  */
 export function StatBar({ label, accessibilityLabel, value, color, delayMs = 0 }: StatBarProps) {
   const progress = useSharedValue(0);
+  const styles = useStyles();
+  const { palette } = useTheme();
 
   useEffect(() => {
     const target = Math.min(Math.max(value, 0), MAX_BASE_STAT) / MAX_BASE_STAT;
@@ -53,7 +56,7 @@ export function StatBar({ label, accessibilityLabel, value, color, delayMs = 0 }
 
   return (
     <View style={styles.row} {...summaryProps(accessibilityLabel)}>
-      <Text style={[styles.label, { color: accentOn(color) }]}>{label}</Text>
+      <Text style={[styles.label, { color: accentOn(color, palette.surface) }]}>{label}</Text>
       <View style={styles.divider} />
       <Text style={styles.value}>{String(value).padStart(3, '0')}</Text>
       <View style={[styles.track, { backgroundColor: withAlpha(color, 0.2) }]}>
@@ -63,7 +66,7 @@ export function StatBar({ label, accessibilityLabel, value, color, delayMs = 0 }
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -79,12 +82,12 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 20,
-    backgroundColor: COLORS.light,
+    backgroundColor: c.divider,
   },
   value: {
     ...TYPO.body2,
     width: 28,
-    color: COLORS.dark,
+    color: c.text,
     fontVariant: ['tabular-nums'],
   },
   track: {
@@ -98,4 +101,4 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: RADIUS.pill,
   },
-});
+}));

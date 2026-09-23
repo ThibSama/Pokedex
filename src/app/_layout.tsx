@@ -6,10 +6,14 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { FavoritesProvider } from '@/favorites/FavoritesProvider';
 import { hydrateLanguage } from '@/i18n';
+import { ThemeProvider } from '@/theme/ThemeProvider';
+import { loadThemeMode } from '@/theme/themeStorage';
+import type { ThemeMode } from '@/theme/tokens';
 import { POPPINS_FONTS } from '@/theme/typography';
 
-// Keep the splash up while Poppins loads and the stored language is applied, so
-// no screen paints in the system font or in the wrong language first.
+// Keep the splash up while Poppins loads and the stored language and theme are
+// applied, so no screen paints in the system font, the wrong language or the
+// wrong theme first.
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Non-fatal: the splash simply hides on its own schedule.
 });
@@ -20,7 +24,9 @@ export default function RootLayout() {
   // to override it. Effects never run during web static rendering, so the
   // exported HTML is an empty shell too rather than a page in a fixed language.
   const [languageReady, setLanguageReady] = useState(false);
-  const ready = fontsLoaded && languageReady;
+  // Null until the stored theme is read; a missing or unreadable one is Light.
+  const [themeMode, setThemeMode] = useState<ThemeMode | null>(null);
+  const ready = fontsLoaded && languageReady && themeMode !== null;
 
   useEffect(() => {
     hydrateLanguage()
@@ -28,6 +34,8 @@ export default function RootLayout() {
         // Keep the device language: a storage problem must never hold the splash.
       })
       .finally(() => setLanguageReady(true));
+    // Never rejects: any storage problem already resolves to Light.
+    loadThemeMode().then(setThemeMode);
   }, []);
 
   useEffect(() => {
@@ -41,18 +49,20 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <FavoritesProvider>
-      {/* One width cap for every route: on a wide browser the whole navigator
-          is centered in a phone-sized column; on native it is a no-op. */}
-      <AppShell>
-        <Stack screenOptions={{ headerShown: false }}>
-          {/* Every screen paints its own Figma header area, back affordance included. */}
-          <Stack.Screen name="index" />
-          <Stack.Screen name="pokedex" />
-          <Stack.Screen name="collection" />
-          <Stack.Screen name="pokemon/[id]" />
-        </Stack>
-      </AppShell>
-    </FavoritesProvider>
+    <ThemeProvider initialMode={themeMode}>
+      <FavoritesProvider>
+        {/* One width cap for every route: on a wide browser the whole navigator
+            is centered in a phone-sized column; on native it is a no-op. */}
+        <AppShell>
+          <Stack screenOptions={{ headerShown: false }}>
+            {/* Every screen paints its own Figma header area, back affordance included. */}
+            <Stack.Screen name="index" />
+            <Stack.Screen name="pokedex" />
+            <Stack.Screen name="collection" />
+            <Stack.Screen name="pokemon/[id]" />
+          </Stack>
+        </AppShell>
+      </FavoritesProvider>
+    </ThemeProvider>
   );
 }

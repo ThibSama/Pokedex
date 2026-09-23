@@ -23,6 +23,10 @@ const fr = {
       en: "English",
     },
   },
+  theme: {
+    /** One on/off setting: the switch reads "Mode sombre", on or off. */
+    dark: "Mode sombre",
+  },
   shell: {
     back: "Revenir à l’écran précédent",
   },

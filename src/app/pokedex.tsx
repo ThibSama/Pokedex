@@ -34,9 +34,10 @@ import { getTypeColor, TYPE_NAMES } from "@/constants/typeColors";
 import { LOCALE_TAGS } from "@/i18n/languages";
 import { usePokemonText } from "@/i18n/pokemonText";
 import { foregroundOn } from "@/theme/contrast";
+import { useMessageStyles } from "@/theme/messages";
+import { createThemedStyles, useTheme } from "@/theme/ThemeProvider";
 import {
-  COLORS,
-  MESSAGE,
+  BRAND,
   OPACITY,
   RADIUS,
   SCRIM,
@@ -105,6 +106,9 @@ export default function PokedexListScreen() {
   const { language, typeLabel } = usePokemonText();
   const width = useFrameWidth();
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
+  const message = useMessageStyles();
+  const { palette } = useTheme();
 
   // Canonical loaded data, in fetch order. Never sorted/filtered in place.
   const [items, setItems] = useState<PokemonSummary[]>([]);
@@ -229,7 +233,7 @@ export default function PokedexListScreen() {
             <MaterialCommunityIcons
               name="magnify"
               size={18}
-              color={COLORS.red}
+              color={palette.accent}
               {...DECORATIVE}
             />
             <TextInput
@@ -238,7 +242,7 @@ export default function PokedexListScreen() {
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
               placeholder={t("pokedex.searchPlaceholder")}
-              placeholderTextColor={COLORS.medium}
+              placeholderTextColor={palette.textMuted}
               autoCorrect={false}
               autoCapitalize="none"
               clearButtonMode="while-editing"
@@ -268,7 +272,7 @@ export default function PokedexListScreen() {
                   <MaterialCommunityIcons
                     name={SORT_ICONS[mode]}
                     size={18}
-                    color={selected ? COLORS.white : COLORS.red}
+                    color={selected ? BRAND.white : palette.accent}
                     {...DECORATIVE}
                   />
                 </Pressable>
@@ -299,7 +303,7 @@ export default function PokedexListScreen() {
             <MaterialCommunityIcons
               name="filter-variant"
               size={16}
-              color={COLORS.red}
+              color={palette.accent}
               {...DECORATIVE}
             />
             {selectedType !== null && (
@@ -319,7 +323,7 @@ export default function PokedexListScreen() {
             <MaterialCommunityIcons
               name="chevron-down"
               size={16}
-              color={COLORS.red}
+              color={palette.accent}
               {...DECORATIVE}
             />
           </Pressable>
@@ -329,13 +333,13 @@ export default function PokedexListScreen() {
       <PokedexSurface>
         {isInitialLoading ? (
           <StateView>
-            <ActivityIndicator color={COLORS.red} />
-            <Text style={MESSAGE.muted}>{t("pokedex.loading")}</Text>
+            <ActivityIndicator color={palette.accent} />
+            <Text style={message.muted}>{t("pokedex.loading")}</Text>
           </StateView>
         ) : isInitialError ? (
           <StateView announce="alert">
-            <Text style={MESSAGE.error}>{t("pokedex.loadError")}</Text>
-            <Text style={MESSAGE.muted}>
+            <Text style={message.error}>{t("pokedex.loadError")}</Text>
+            <Text style={message.muted}>
               {errorMessage || t("common.unknownError")}
             </Text>
             <PrimaryButton label={t("common.retry")} onPress={retry} />
@@ -354,7 +358,7 @@ export default function PokedexListScreen() {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <StateView announce="status">
-                <Text style={MESSAGE.muted}>{t("pokedex.empty")}</Text>
+                <Text style={message.muted}>{t("pokedex.empty")}</Text>
               </StateView>
             }
             ListFooterComponent={
@@ -448,7 +452,8 @@ function FilterOption({
   selected: boolean;
   onPress: () => void;
 }) {
-  const fill = color ?? COLORS.red;
+  const styles = useStyles();
+  const fill = color ?? BRAND.red;
   const foreground = foregroundOn(fill);
   return (
     <Pressable
@@ -503,6 +508,9 @@ function ListFooter({
   onRetry: () => void;
 }) {
   const { t } = useTranslation();
+  const styles = useStyles();
+  const message = useMessageStyles();
+  const { palette } = useTheme();
   const progress = t("pokedex.progress", {
     loaded: loadedCount,
     total: NATIONAL_DEX_TOTAL,
@@ -510,8 +518,8 @@ function ListFooter({
   if (status === "error") {
     return (
       <View style={styles.footer} role="alert">
-        <Text style={MESSAGE.error}>{t("pokedex.pageError")}</Text>
-        <Text style={MESSAGE.muted}>
+        <Text style={message.error}>{t("pokedex.pageError")}</Text>
+        <Text style={message.muted}>
           {errorMessage || t("common.unknownError")}
         </Text>
         <PrimaryButton label={t("common.retry")} onPress={onRetry} />
@@ -521,7 +529,7 @@ function ListFooter({
   if (!hasMore) {
     return (
       <View style={styles.footer}>
-        <Text style={MESSAGE.muted}>
+        <Text style={message.muted}>
           {t("pokedex.end", { count: loadedCount })}
         </Text>
       </View>
@@ -540,14 +548,14 @@ function ListFooter({
       aria-valuenow={loadedCount}
       aria-valuetext={progress}>
       {status === "loadingMore" && (
-        <ActivityIndicator color={COLORS.red} {...DECORATIVE} />
+        <ActivityIndicator color={palette.accent} {...DECORATIVE} />
       )}
-      <Text style={MESSAGE.muted}>{progress}</Text>
+      <Text style={message.muted}>{progress}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   controlsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -566,18 +574,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
     paddingHorizontal: SPACING.md - 2,
-    backgroundColor: COLORS.white,
+    backgroundColor: c.card,
     ...SHADOW.float,
   },
   searchFieldFocused: {
-    borderColor: COLORS.dark,
+    borderColor: c.text,
   },
   searchInput: {
     flex: 1,
     // Body1 without its 14px line-height, which would clip descenders in a native input.
     fontFamily: FONT_FAMILY.regular,
     fontSize: 14,
-    color: COLORS.dark,
+    color: c.text,
   },
   sortGroup: {
     flexDirection: "row",
@@ -586,7 +594,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: RADIUS.field,
     padding: SPACING.xs,
-    backgroundColor: COLORS.white,
+    backgroundColor: c.card,
     ...SHADOW.float,
   },
   sortButton: {
@@ -597,7 +605,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sortButtonSelected: {
-    backgroundColor: COLORS.red,
+    backgroundColor: c.chrome,
   },
   filterRow: {
     flexDirection: "row",
@@ -612,7 +620,7 @@ const styles = StyleSheet.create({
     minHeight: 32,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.white,
+    backgroundColor: c.card,
     ...SHADOW.float,
   },
   filterDot: {
@@ -622,7 +630,7 @@ const styles = StyleSheet.create({
   },
   filterLabel: {
     ...TYPO.subtitle3,
-    color: COLORS.dark,
+    color: c.text,
   },
   filterBackdrop: {
     flex: 1,
@@ -638,11 +646,11 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     borderTopLeftRadius: RADIUS.card,
     borderTopRightRadius: RADIUS.card,
-    backgroundColor: COLORS.white,
+    backgroundColor: c.card,
   },
   filterPanelTitle: {
     ...TYPO.subtitle1,
-    color: COLORS.dark,
+    color: c.text,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
   },
@@ -662,7 +670,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
     paddingHorizontal: SPACING.sm,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
   },
   optionDot: {
     width: 8,
@@ -671,7 +679,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     ...TYPO.body2,
-    color: COLORS.dark,
+    color: c.text,
   },
   optionTextSelected: {
     ...TYPO.subtitle2,
@@ -693,4 +701,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: OPACITY.pressed,
   },
-});
+}));

@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { usePokemonText } from '@/i18n/pokemonText';
-import { COLORS, OPACITY, RADIUS, SHADOW } from '@/theme/tokens';
+import { createThemedStyles } from '@/theme/ThemeProvider';
+import { OPACITY, RADIUS, SHADOW } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { PokemonSummary } from '@/types/pokemon';
 import { formatDexNumber } from '@/utils/pokemonList';
@@ -20,6 +21,7 @@ interface PokemonCardProps {
 export function PokemonCard({ pokemon, width }: PokemonCardProps) {
   const { t } = useTranslation();
   const { name, cardLabel } = usePokemonText();
+  const styles = useStyles();
   // `Link asChild` hands the child to Radix's Slot, which merges styles with
   // `{ ...slotStyle, ...childStyle }`. Spreading a style *function* — or an
   // array — into an object silently yields `{}`, dropping every style including
@@ -59,13 +61,13 @@ const TILE_PADDING_TOP = 2;
 /** Figma artwork box inside a tile. */
 const TILE_ARTWORK_SIZE = 72;
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   /**
    * Figma tile: 104x108 at a 360px frame. The height is composed rather than
    * fixed — 2 (padding) + 12 (Dex number) + 72 (artwork) + 22 (name band).
    */
   tile: {
-    backgroundColor: COLORS.white,
+    backgroundColor: c.card,
     borderRadius: RADIUS.sheet,
     paddingTop: TILE_PADDING_TOP,
     alignItems: 'center',
@@ -79,7 +81,7 @@ const styles = StyleSheet.create({
   tileDexNumber: {
     ...TYPO.caption,
     alignSelf: 'flex-end',
-    color: COLORS.medium,
+    color: c.textMuted,
     fontVariant: ['tabular-nums'],
     paddingRight: 8,
   },
@@ -89,7 +91,7 @@ const styles = StyleSheet.create({
   },
   tileFooter: {
     width: '100%',
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
     borderBottomLeftRadius: RADIUS.sheet,
     borderBottomRightRadius: RADIUS.sheet,
     paddingVertical: 3,
@@ -97,7 +99,7 @@ const styles = StyleSheet.create({
   },
   tileName: {
     ...TYPO.body3,
-    color: COLORS.dark,
+    color: c.text,
     textAlign: 'center',
   },
-});
+}));

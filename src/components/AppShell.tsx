@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
-import { COLORS, SHADOW } from '@/theme/tokens';
+import { createThemedStyles } from '@/theme/ThemeProvider';
+import { INK, SHADOW } from '@/theme/tokens';
 
 /**
  * Widest the app is ever painted. Mobile stays the product authority, so on a
@@ -14,11 +15,12 @@ export const APP_FRAME_MAX_WIDTH = 480;
  * One keyboard focus ring for every control on web. React Native styles have no
  * `:focus-visible`, and the browser default is a thin ring that is hard to see
  * on the red chrome. Two tones — a white halo inside a dark outline — read on
- * red (dark 3.2:1, white 5.1:1), on white and on every type accent. Only
+ * red (dark 3.2:1, white 5.1:1), on white, on the Dark sheets and on every type
+ * accent, so the ring is the same in both themes. Only
  * keyboard focus matches, so taps and clicks draw nothing. Text inputs are
  * left alone: the search field paints its own focused border.
  */
-const FOCUS_RING_CSS = `[tabindex="0"]:focus-visible,a[href]:focus-visible{outline:3px solid ${COLORS.dark};outline-offset:2px;box-shadow:0 0 0 2px ${COLORS.white};}`;
+const FOCUS_RING_CSS = `[tabindex="0"]:focus-visible,a[href]:focus-visible{outline:3px solid ${INK.dark};outline-offset:2px;box-shadow:0 0 0 2px ${INK.light};}`;
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const style = document.createElement('style');
@@ -49,6 +51,7 @@ export function useFrameWidth(): number {
  * does not flash the full-width layout before a measurement arrives.
  */
 export function AppShell({ children }: { children: ReactNode }) {
+  const styles = useStyles();
   if (Platform.OS !== 'web') return <>{children}</>;
   return (
     <View style={styles.backdrop}>
@@ -57,18 +60,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   backdrop: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: COLORS.light,
+    backgroundColor: c.backdrop,
   },
   frame: {
     flex: 1,
     width: '100%',
     maxWidth: APP_FRAME_MAX_WIDTH,
     overflow: 'hidden',
-    backgroundColor: COLORS.background,
+    backgroundColor: c.frame,
     ...SHADOW.frame,
   },
-});
+}));

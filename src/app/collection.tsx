@@ -11,7 +11,9 @@ import { PrimaryButton, StateView } from '@/components/Controls';
 import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
 import { useFavorites } from '@/favorites/FavoritesProvider';
 import { usePokemonText } from '@/i18n/pokemonText';
-import { COLORS, MESSAGE, OPACITY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
+import { useMessageStyles } from '@/theme/messages';
+import { createThemedStyles, useTheme } from '@/theme/ThemeProvider';
+import { OPACITY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { NationalDexId, PokemonSummary, SpriteVariant } from '@/types/pokemon';
 import { DECORATIVE } from '@/utils/a11y';
@@ -25,6 +27,9 @@ export default function CollectionScreen() {
   const { t } = useTranslation();
   const { hydrated, favoriteEntries, favoriteIds, getFavorite } = useFavorites();
   const frameWidth = useFrameWidth();
+  const styles = useStyles();
+  const message = useMessageStyles();
+  const { palette } = useTheme();
 
   const [items, setItems] = useState<PokemonSummary[]>([]);
   const [status, setStatus] = useState<LoadStatus>('loading');
@@ -108,24 +113,24 @@ export default function CollectionScreen() {
       <PokedexSurface>
         {!hydrated || status === 'loading' ? (
           <StateView>
-            <ActivityIndicator color={COLORS.red} />
-            <Text style={MESSAGE.muted}>
+            <ActivityIndicator color={palette.accent} />
+            <Text style={message.muted}>
               {t(hydrated ? 'collection.loading' : 'common.readingCollection')}
             </Text>
           </StateView>
         ) : status === 'error' ? (
           <StateView announce="alert">
-            <Text style={MESSAGE.error}>{t('collection.error')}</Text>
-            <Text style={MESSAGE.muted}>{errorMessage ?? t('common.unknownError')}</Text>
+            <Text style={message.error}>{t('collection.error')}</Text>
+            <Text style={message.muted}>{errorMessage ?? t('common.unknownError')}</Text>
             <PrimaryButton label={t('common.retry')} onPress={retry} />
           </StateView>
         ) : items.length === 0 ? (
           <StateView>
             <View style={styles.emptyBadge}>
-              <MaterialCommunityIcons name="heart-outline" size={44} color={COLORS.red} {...DECORATIVE} />
+              <MaterialCommunityIcons name="heart-outline" size={44} color={palette.accent} {...DECORATIVE} />
             </View>
             <Text style={styles.emptyTitle}>{t('collection.emptyTitle')}</Text>
-            <Text style={MESSAGE.muted}>{t('collection.emptyBody')}</Text>
+            <Text style={message.muted}>{t('collection.emptyBody')}</Text>
             <PrimaryButton
               label={t('collection.openPokedex')}
               onPress={() => router.push('/pokedex')}
@@ -174,6 +179,8 @@ function CollectionSlot({
 }) {
   const { t } = useTranslation();
   const { name, cardLabel } = usePokemonText();
+  const styles = useStyles();
+  const { palette } = useTheme();
   // `Link asChild` hands the child to Radix's Slot, which merges styles with an
   // object spread: a style *function* or array would silently become `{}`. So
   // press state is tracked here and flattened into the single object Slot takes.
@@ -195,7 +202,7 @@ function CollectionSlot({
         style={style}>
         {isShiny && (
           <View style={styles.shinyBadge}>
-            <MaterialCommunityIcons name="star-four-points" size={14} color={COLORS.red} {...DECORATIVE} />
+            <MaterialCommunityIcons name="star-four-points" size={14} color={palette.accent} {...DECORATIVE} />
           </View>
         )}
         {sprite !== null && (
@@ -209,7 +216,7 @@ function CollectionSlot({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((c) => ({
   box: {
     // A sparse box sits in the middle of the sheet instead of hugging the top
     // edge; once it is taller than the sheet this grows with the content.
@@ -224,7 +231,7 @@ const styles = StyleSheet.create({
     gap: GRID_GAP,
   },
   slot: {
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
     borderRadius: RADIUS.card,
     alignItems: 'center',
     justifyContent: 'center',
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
   },
   slotName: {
     ...TYPO.body2,
-    color: COLORS.dark,
+    color: c.text,
     textAlign: 'center',
   },
   shinyBadge: {
@@ -254,7 +261,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.chip,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: c.card,
   },
   emptyBadge: {
     width: 88,
@@ -262,14 +269,14 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: c.surfaceMuted,
     marginBottom: SPACING.xs,
   },
   emptyTitle: {
     ...TYPO.subtitle1,
     fontSize: 18,
     lineHeight: 24,
-    color: COLORS.dark,
+    color: c.text,
     textAlign: 'center',
   },
-});
+}));
