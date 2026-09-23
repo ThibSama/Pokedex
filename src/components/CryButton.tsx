@@ -1,9 +1,13 @@
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import {
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+} from "expo-audio";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import { getPokemonCryUrl } from '@/api/pokemonAudio';
-import { IconButton } from '@/components/Controls';
+import { getPokemonCryUrl } from "@/api/pokemonAudio";
+import { IconButton } from "@/components/Controls";
 
 /** Configure the audio session once per app run, so cries play in iOS silent mode. */
 let audioModeConfigured = false;
@@ -30,6 +34,7 @@ export function CryButton({ apiName, name, accent }: CryButtonProps) {
   const url = getPokemonCryUrl(apiName);
   const player = useAudioPlayer(url);
   const status = useAudioPlayerStatus(player);
+  const CRY_VOLUME = 0.05;
   // Keyed by name so a new Pokémon gets a fresh chance without an effect.
   const [failedFor, setFailedFor] = useState<string | null>(null);
 
@@ -41,12 +46,14 @@ export function CryButton({ apiName, name, accent }: CryButtonProps) {
     });
   }, []);
 
-  const unavailable = url === null || failedFor === apiName || status.error !== null;
+  const unavailable =
+    url === null || failedFor === apiName || status.error !== null;
   const disabled = unavailable || !status.isLoaded;
 
   async function playCry() {
     try {
       // Rewind first so a tap after the cry ended replays it from the start.
+      player.volume = CRY_VOLUME;
       await player.seekTo(0);
       player.play();
     } catch {
@@ -56,12 +63,15 @@ export function CryButton({ apiName, name, accent }: CryButtonProps) {
 
   return (
     <IconButton
-      icon={unavailable ? 'volume-off' : 'volume-high'}
+      icon={unavailable ? "volume-off" : "volume-high"}
       accent={accent}
       active={status.playing}
       disabled={disabled}
       onPress={playCry}
-      accessibilityLabel={t(unavailable ? 'detail.cryUnavailable' : 'detail.cryPlay', { name })}
+      accessibilityLabel={t(
+        unavailable ? "detail.cryUnavailable" : "detail.cryPlay",
+        { name },
+      )}
       accessibilityState={{ busy: status.playing }}
     />
   );
