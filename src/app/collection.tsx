@@ -14,6 +14,7 @@ import { usePokemonText } from '@/i18n/pokemonText';
 import { COLORS, MESSAGE, OPACITY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { NationalDexId, PokemonSummary, SpriteVariant } from '@/types/pokemon';
+import { DECORATIVE } from '@/utils/a11y';
 import { GRID_GAP, gridColumns, gridTileWidth } from '@/utils/grid';
 
 type LoadStatus = 'loading' | 'idle' | 'error';
@@ -113,7 +114,7 @@ export default function CollectionScreen() {
             </Text>
           </StateView>
         ) : status === 'error' ? (
-          <StateView>
+          <StateView announce="alert">
             <Text style={MESSAGE.error}>{t('collection.error')}</Text>
             <Text style={MESSAGE.muted}>{errorMessage ?? t('common.unknownError')}</Text>
             <PrimaryButton label={t('common.retry')} onPress={retry} />
@@ -121,7 +122,7 @@ export default function CollectionScreen() {
         ) : items.length === 0 ? (
           <StateView>
             <View style={styles.emptyBadge}>
-              <MaterialCommunityIcons name="heart-outline" size={44} color={COLORS.red} />
+              <MaterialCommunityIcons name="heart-outline" size={44} color={COLORS.red} {...DECORATIVE} />
             </View>
             <Text style={styles.emptyTitle}>{t('collection.emptyTitle')}</Text>
             <Text style={MESSAGE.muted}>{t('collection.emptyBody')}</Text>
@@ -187,17 +188,18 @@ function CollectionSlot({
       <Pressable
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
-        accessibilityRole="button"
+        // It navigates, so it is a link; its label already says "shiny".
+        role="link"
         accessibilityLabel={cardLabel(pokemon, isShiny)}
         accessibilityHint={t('pokemon.openHint')}
         style={style}>
         {isShiny && (
           <View style={styles.shinyBadge}>
-            <MaterialCommunityIcons name="star-four-points" size={14} color={COLORS.red} />
+            <MaterialCommunityIcons name="star-four-points" size={14} color={COLORS.red} {...DECORATIVE} />
           </View>
         )}
         {sprite !== null && (
-          <Image source={sprite} style={styles.slotArtwork} contentFit="contain" />
+          <Image source={sprite} style={styles.slotArtwork} contentFit="contain" accessibilityLabel="" />
         )}
         <Text style={styles.slotName} numberOfLines={1}>
           {name(pokemon)}

@@ -23,7 +23,6 @@ const en: LocaleResource = {
     shinyCardLabel: 'Shiny {{name}}, number {{number}}, {{types}}',
     typeList: '{{types}} type',
     openHint: 'Opens the Pokémon’s detail page',
-    artwork: '{{name}} artwork',
   },
   home: {
     title: 'Pokédex',
@@ -57,6 +56,7 @@ const en: LocaleResource = {
     searchLabel: 'Search the Pokémon loaded so far',
     searchHint: 'Filters the list by French name, English name or Pokédex number',
     sort: {
+      label: 'Sort order',
       dex: 'Sort by Pokédex number',
       name: 'Sort by name',
     },
@@ -64,6 +64,7 @@ const en: LocaleResource = {
       all: 'All',
       buttonAll: 'Filter by type, all types',
       buttonType: 'Filter by type, {{type}}',
+      dialogLabel: 'Filter by type',
       panelTitle: 'Type',
       close: 'Close the type picker',
       optionAll: 'All types',
@@ -73,6 +74,7 @@ const en: LocaleResource = {
     loadError: 'Couldn’t load the Pokémon.',
     empty: 'No loaded Pokémon match.',
     progress: '{{loaded}} / {{total}} Pokémon loaded',
+    progressLabel: 'Loading the Pokédex',
     pageError: 'Loading failed.',
     end: 'End of the Pokédex — {{count}} Pokémon loaded.',
   },
@@ -123,7 +125,7 @@ const en: LocaleResource = {
     specialAttack: { short: 'SATK', long: 'Special attack' },
     specialDefense: { short: 'SDEF', long: 'Special defense' },
     speed: { short: 'SPD', long: 'Speed' },
-    value: '{{stat}} {{value}}',
+    value: '{{stat}}, {{value}}',
   },
   types: {
     bug: 'Bug',

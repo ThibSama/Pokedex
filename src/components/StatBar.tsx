@@ -9,8 +9,10 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { withAlpha } from '@/constants/typeColors';
+import { accentOn } from '@/theme/contrast';
 import { COLORS, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
+import { summaryProps } from '@/utils/a11y';
 
 /** Maximum base stat in the main series; bars are scaled against it. */
 export const MAX_BASE_STAT = 255;
@@ -22,10 +24,10 @@ const TRACK_HEIGHT = 6;
 interface StatBarProps {
   /** Short label painted in the row, e.g. `ATK`. */
   label: string;
-  /** What a screen reader announces for the whole row, e.g. "Attack 110". */
-  accessibilityLabel?: string;
+  /** The row's one spoken element, e.g. "Attack, 110". */
+  accessibilityLabel: string;
   value: number;
-  /** Accent color for label, fill and tinted track. */
+  /** Accent for the fill and tinted track; the label text uses a readable shade of it. */
   color: string;
   /** Stagger offset before the fill starts. */
   delayMs?: number;
@@ -50,8 +52,8 @@ export function StatBar({ label, accessibilityLabel, value, color, delayMs = 0 }
   }));
 
   return (
-    <View style={styles.row} accessible accessibilityLabel={accessibilityLabel}>
-      <Text style={[styles.label, { color }]}>{label}</Text>
+    <View style={styles.row} {...summaryProps(accessibilityLabel)}>
+      <Text style={[styles.label, { color: accentOn(color) }]}>{label}</Text>
       <View style={styles.divider} />
       <Text style={styles.value}>{String(value).padStart(3, '0')}</Text>
       <View style={[styles.track, { backgroundColor: withAlpha(color, 0.2) }]}>

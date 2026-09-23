@@ -78,7 +78,7 @@ export function CryButton({ apiName, name, accent }: CryButtonProps) {
         unavailable ? "detail.cryUnavailable" : "detail.cryPlay",
         { name },
       )}
-      accessibilityState={{ busy: status.playing }}
+      busy={status.playing}
     />
   );
 }

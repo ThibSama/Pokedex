@@ -33,6 +33,7 @@ import { PokemonCard } from "@/components/PokemonCard";
 import { getTypeColor, TYPE_NAMES } from "@/constants/typeColors";
 import { LOCALE_TAGS } from "@/i18n/languages";
 import { usePokemonText } from "@/i18n/pokemonText";
+import { foregroundOn } from "@/theme/contrast";
 import {
   COLORS,
   MESSAGE,
@@ -45,6 +46,7 @@ import {
 } from "@/theme/tokens";
 import { FONT_FAMILY, TYPO } from "@/theme/typography";
 import type { PokemonSummary } from "@/types/pokemon";
+import { choiceProps, DECORATIVE, SECTION_HEADING } from "@/utils/a11y";
 import { GRID_GAP, gridTileWidth } from "@/utils/grid";
 import {
   applyListOptions,
@@ -68,6 +70,18 @@ const SORT_MODES = Object.keys(SORT_ICONS) as SortMode[];
 
 /** Figma list frame 1017:431. */
 const COLUMNS = 3;
+
+/**
+ * Native touch targets (react-native-web ignores `hitSlop`). The 32px sort
+ * buttons sit 4px apart inside their group, so their slops stay inside those
+ * 4px; the 32px Filter pill and the 40px type options reach 44 tall.
+ */
+const SORT_HIT_SLOP = [
+  { top: 6, bottom: 6, left: 6, right: 2 },
+  { top: 6, bottom: 6, left: 2, right: 6 },
+];
+const FILTER_HIT_SLOP = { top: 6, bottom: 6 };
+const OPTION_HIT_SLOP = 2;
 
 /**
  * The browser paints its own focus ring on a text input; the field draws an
@@ -216,6 +230,7 @@ export default function PokedexListScreen() {
               name="magnify"
               size={18}
               color={COLORS.red}
+              {...DECORATIVE}
             />
             <TextInput
               value={options.query}
@@ -232,15 +247,18 @@ export default function PokedexListScreen() {
               accessibilityHint={t("pokedex.searchHint")}
             />
           </View>
-          <View style={styles.sortGroup} accessibilityRole="radiogroup">
-            {SORT_MODES.map((mode) => {
+          <View
+            style={styles.sortGroup}
+            role="group"
+            aria-label={t("pokedex.sort.label")}>
+            {SORT_MODES.map((mode, index) => {
               const selected = options.sort === mode;
               return (
                 <Pressable
                   key={mode}
                   onPress={() => setOptions((o) => ({ ...o, sort: mode }))}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
+                  hitSlop={SORT_HIT_SLOP[index]}
+                  {...choiceProps(selected)}
                   accessibilityLabel={t(`pokedex.sort.${mode}`)}
                   style={({ pressed }) => [
                     styles.sortButton,
@@ -251,6 +269,7 @@ export default function PokedexListScreen() {
                     name={SORT_ICONS[mode]}
                     size={18}
                     color={selected ? COLORS.white : COLORS.red}
+                    {...DECORATIVE}
                   />
                 </Pressable>
               );
@@ -263,8 +282,9 @@ export default function PokedexListScreen() {
         <View style={styles.filterRow}>
           <Pressable
             onPress={() => setFilterOpen(true)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: filterOpen }}
+            hitSlop={FILTER_HIT_SLOP}
+            role="button"
+            aria-expanded={filterOpen}
             accessibilityLabel={
               selectedType === null
                 ? t("pokedex.filter.buttonAll")
@@ -280,6 +300,7 @@ export default function PokedexListScreen() {
               name="filter-variant"
               size={16}
               color={COLORS.red}
+              {...DECORATIVE}
             />
             {selectedType !== null && (
               <View
@@ -287,6 +308,7 @@ export default function PokedexListScreen() {
                   styles.filterDot,
                   { backgroundColor: getTypeColor(selectedType) },
                 ]}
+                {...DECORATIVE}
               />
             )}
             <Text style={styles.filterLabel} numberOfLines={1}>
@@ -298,6 +320,7 @@ export default function PokedexListScreen() {
               name="chevron-down"
               size={16}
               color={COLORS.red}
+              {...DECORATIVE}
             />
           </Pressable>
         </View>
@@ -310,7 +333,7 @@ export default function PokedexListScreen() {
             <Text style={MESSAGE.muted}>{t("pokedex.loading")}</Text>
           </StateView>
         ) : isInitialError ? (
-          <StateView>
+          <StateView announce="alert">
             <Text style={MESSAGE.error}>{t("pokedex.loadError")}</Text>
             <Text style={MESSAGE.muted}>
               {errorMessage || t("common.unknownError")}
@@ -330,7 +353,7 @@ export default function PokedexListScreen() {
             columnWrapperStyle={styles.column}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
-              <StateView>
+              <StateView announce="status">
                 <Text style={MESSAGE.muted}>{t("pokedex.empty")}</Text>
               </StateView>
             }
@@ -352,7 +375,9 @@ export default function PokedexListScreen() {
         visible={filterOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setFilterOpen(false)}>
+        onRequestClose={() => setFilterOpen(false)}
+        // react-native-web spreads this onto its role="dialog" element.
+        aria-label={t("pokedex.filter.dialogLabel")}>
         <View style={styles.filterBackdrop}>
           <Pressable
             style={StyleSheet.absoluteFill}
@@ -367,7 +392,7 @@ export default function PokedexListScreen() {
               { paddingBottom: insets.bottom + SPACING.lg },
             ]}
             accessibilityViewIsModal>
-            <Text style={styles.filterPanelTitle}>
+            <Text style={styles.filterPanelTitle} {...SECTION_HEADING}>
               {t("pokedex.filter.panelTitle")}
             </Text>
 
@@ -402,7 +427,12 @@ export default function PokedexListScreen() {
   );
 }
 
-/** One selectable type in the filter panel: color indicator plus label. */
+/**
+ * One selectable type in the filter panel: color indicator plus label. The
+ * selected option is filled with its type color — its text white or dark,
+ * whichever reads — and also marked by a check and a bolder label, so the
+ * choice never rests on color alone.
+ */
 function FilterOption({
   label,
   accessibilityLabel,
@@ -418,27 +448,40 @@ function FilterOption({
   selected: boolean;
   onPress: () => void;
 }) {
+  const fill = color ?? COLORS.red;
+  const foreground = foregroundOn(fill);
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
+      hitSlop={OPTION_HIT_SLOP}
+      {...choiceProps(selected)}
       accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
         styles.option,
-        selected && { backgroundColor: color ?? COLORS.red },
+        selected && { backgroundColor: fill },
         pressed && styles.pressed,
       ]}>
-      {color !== null && (
-        <View
-          style={[
-            styles.optionDot,
-            { backgroundColor: selected ? COLORS.white : color },
-          ]}
+      {selected ? (
+        <MaterialCommunityIcons
+          name="check"
+          size={14}
+          color={foreground}
+          {...DECORATIVE}
         />
+      ) : (
+        color !== null && (
+          <View
+            style={[styles.optionDot, { backgroundColor: color }]}
+            {...DECORATIVE}
+          />
+        )
       )}
       <Text
-        style={[styles.optionText, selected && styles.optionTextSelected]}
+        style={[
+          styles.optionText,
+          selected && styles.optionTextSelected,
+          selected && { color: foreground },
+        ]}
         numberOfLines={1}>
         {label}
       </Text>
@@ -464,17 +507,9 @@ function ListFooter({
     loaded: loadedCount,
     total: NATIONAL_DEX_TOTAL,
   });
-  if (status === "loadingMore") {
-    return (
-      <View style={styles.footer} accessibilityRole="progressbar">
-        <ActivityIndicator color={COLORS.red} />
-        <Text style={MESSAGE.muted}>{progress}</Text>
-      </View>
-    );
-  }
   if (status === "error") {
     return (
-      <View style={styles.footer}>
+      <View style={styles.footer} role="alert">
         <Text style={MESSAGE.error}>{t("pokedex.pageError")}</Text>
         <Text style={MESSAGE.muted}>
           {errorMessage || t("common.unknownError")}
@@ -492,10 +527,21 @@ function ListFooter({
       </View>
     );
   }
-  // Between two pages of the hydration chain: brief, and the next page is
-  // already on its way.
+  // Background hydration: one progress bar a screen reader can read on demand.
+  // Deliberately not a live region, so the 9 page arrivals are never
+  // announced one by one. Between two pages the spinner is simply absent.
   return (
-    <View style={styles.footer}>
+    <View
+      style={styles.footer}
+      role="progressbar"
+      aria-label={t("pokedex.progressLabel")}
+      aria-valuemin={0}
+      aria-valuemax={NATIONAL_DEX_TOTAL}
+      aria-valuenow={loadedCount}
+      aria-valuetext={progress}>
+      {status === "loadingMore" && (
+        <ActivityIndicator color={COLORS.red} {...DECORATIVE} />
+      )}
       <Text style={MESSAGE.muted}>{progress}</Text>
     </View>
   );
@@ -562,7 +608,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 32,
+    // min-: grows with a larger text size instead of clipping the label.
+    minHeight: 32,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.white,
@@ -612,7 +659,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    height: 40,
+    minHeight: 40,
     paddingHorizontal: SPACING.sm,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.background,
@@ -628,7 +675,6 @@ const styles = StyleSheet.create({
   },
   optionTextSelected: {
     ...TYPO.subtitle2,
-    color: COLORS.white,
   },
   list: {
     paddingHorizontal: SHELL.listPadding,

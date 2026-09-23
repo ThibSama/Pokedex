@@ -31,7 +31,6 @@ const fr = {
     shinyCardLabel: '{{name}} shiny, numéro {{number}}, {{types}}',
     typeList: 'type {{types}}',
     openHint: 'Ouvre la fiche détaillée du Pokémon',
-    artwork: 'Illustration de {{name}}',
   },
   home: {
     title: 'Pokédex',
@@ -65,6 +64,7 @@ const fr = {
     searchLabel: 'Rechercher un Pokémon parmi ceux déjà chargés',
     searchHint: 'Filtre la liste par nom français, nom anglais ou numéro du Pokédex',
     sort: {
+      label: 'Ordre de tri',
       dex: 'Trier par numéro du Pokédex',
       name: 'Trier par nom',
     },
@@ -72,6 +72,7 @@ const fr = {
       all: 'Tous',
       buttonAll: 'Filtrer par type, tous les types',
       buttonType: 'Filtrer par type, {{type}}',
+      dialogLabel: 'Filtrer par type',
       panelTitle: 'Type',
       close: 'Fermer le sélecteur de type',
       optionAll: 'Tous les types',
@@ -81,6 +82,7 @@ const fr = {
     loadError: 'Impossible de charger les Pokémon.',
     empty: 'Aucun Pokémon chargé ne correspond.',
     progress: '{{loaded}} / {{total}} Pokémon chargés',
+    progressLabel: 'Chargement du Pokédex',
     pageError: 'Échec du chargement.',
     end: 'Fin du Pokédex — {{count}} Pokémon chargés.',
   },
@@ -133,7 +135,8 @@ const fr = {
     specialAttack: { short: 'A.SP', long: 'Attaque spéciale' },
     specialDefense: { short: 'D.SP', long: 'Défense spéciale' },
     speed: { short: 'VIT', long: 'Vitesse' },
-    value: '{{stat}} {{value}}',
+    /** One spoken element per row: « Attaque, 110 ». */
+    value: '{{stat}}, {{value}}',
   },
   /** Official French type names, keyed by canonical PokéAPI slug. */
   types: {

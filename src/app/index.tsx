@@ -12,9 +12,11 @@ import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor, withAlpha } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
 import { usePokemonText } from '@/i18n/pokemonText';
+import { accentOn, MIN_CONTRAST } from '@/theme/contrast';
 import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { NationalDexId, PokemonSummary, SpriteVariant } from '@/types/pokemon';
+import { DECORATIVE } from '@/utils/a11y';
 import { formatDexNumber } from '@/utils/pokemonList';
 
 /** Shown as the hero while the collection is still empty. */
@@ -146,7 +148,7 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : state.status === 'error' ? (
-            <View style={styles.featured}>
+            <View style={styles.featured} role="alert">
               {kicker}
               <Stage />
               <Text style={MESSAGE.error}>{t('home.heroError')}</Text>
@@ -156,19 +158,15 @@ export default function HomeScreen() {
           ) : (
             <Pressable
               onPress={() => openHero(heroVariant)}
-              accessibilityRole="button"
+              role="button"
               accessibilityLabel={cardLabel(state.pokemon, isShinyHero)}
               accessibilityHint={t('pokemon.openHint')}
               style={({ pressed }) => [styles.featured, pressed && styles.pressed]}>
               {kicker}
               <Stage>
+                {/* The button's label already names the Pokémon: the artwork is decorative. */}
                 {heroSprite !== null && (
-                  <Image
-                    source={heroSprite}
-                    style={styles.artwork}
-                    contentFit="contain"
-                    accessibilityLabel={t('pokemon.artwork', { name: name(state.pokemon) })}
-                  />
+                  <Image source={heroSprite} style={styles.artwork} contentFit="contain" accessibilityLabel="" />
                 )}
               </Stage>
               <Text style={styles.dexNumber}>{formatDexNumber(state.pokemon.id)}</Text>
@@ -180,7 +178,7 @@ export default function HomeScreen() {
               </View>
               <View style={styles.cta}>
                 <Text style={styles.ctaText}>{t('home.viewEntry')}</Text>
-                <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.red} />
+                <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.red} {...DECORATIVE} />
               </View>
             </Pressable>
           )}
@@ -226,7 +224,7 @@ function Stage({ children }: { children?: ReactNode }) {
     <View style={styles.stage}>
       <View style={styles.disc} pointerEvents="none">
         <View style={styles.discWatermark}>
-          <MaterialCommunityIcons name="pokeball" size={STAGE_SIZE} color={OVERLAY.watermark} />
+          <MaterialCommunityIcons name="pokeball" size={STAGE_SIZE} color={OVERLAY.watermark} {...DECORATIVE} />
         </View>
       </View>
       {children}
@@ -234,7 +232,11 @@ function Stage({ children }: { children?: ReactNode }) {
   );
 }
 
-/** One shortcut tile: accent icon chip, label, and a live count in accent. */
+/**
+ * One shortcut tile: accent icon chip, label, and a live count in accent. The
+ * count is large text (24px bold), so it takes a shade of the accent that
+ * reaches 3:1 on the tile; the chip and the top edge keep the accent itself.
+ */
 function ActionCard({
   accent,
   icon,
@@ -259,18 +261,20 @@ function ActionCard({
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
+      role="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => [styles.actionCard, { borderTopColor: accent }, pressed && styles.pressed]}
     >
       <View style={[styles.actionIcon, { backgroundColor: withAlpha(accent, 0.14) }]}>
-        <MaterialCommunityIcons name={icon} size={20} color={accent} />
+        <MaterialCommunityIcons name={icon} size={20} color={accent} {...DECORATIVE} />
       </View>
       <Text style={styles.actionTitle}>{title}</Text>
       <Text style={styles.actionSubtitle}>{subtitle}</Text>
       <View style={styles.actionMetric}>
-        <Text style={[styles.actionValue, { color: accent }]}>{value}</Text>
+        <Text style={[styles.actionValue, { color: accentOn(accent, COLORS.background, MIN_CONTRAST.largeText) }]}>
+          {value}
+        </Text>
         <Text style={styles.actionUnit}>{unit}</Text>
       </View>
     </Pressable>

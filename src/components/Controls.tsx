@@ -2,6 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { ComponentProps, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { accentOn, foregroundOn, MIN_CONTRAST } from '@/theme/contrast';
 import { COLORS, OPACITY, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 
@@ -15,6 +16,14 @@ type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 const ICON_BUTTON_SIZE = 28;
 const ICON_SIZE = 16;
+
+/**
+ * Touch-target extensions (native only; react-native-web ignores `hitSlop`).
+ * The 40px pill reaches 44. The 28px icon button reaches 44 tall but only 36
+ * wide, because its row neighbours are 8px apart and slops must not overlap.
+ */
+const PRIMARY_HIT_SLOP = 2;
+const ICON_HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
 interface PrimaryButtonProps {
   label: string;
@@ -35,7 +44,8 @@ export function PrimaryButton({
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
+      hitSlop={PRIMARY_HIT_SLOP}
+      role="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, style]}>
@@ -53,11 +63,15 @@ interface IconButtonProps {
   disabled?: boolean;
   onPress?: () => void;
   accessibilityLabel: string;
-  /** Merged with the derived `disabled` flag. */
-  accessibilityState?: { selected?: boolean; busy?: boolean };
+  /** Exposed as `aria-busy`, e.g. while a cry is playing. */
+  busy?: boolean;
 }
 
-/** A compact secondary action: round, 28px, accent-filled while active. */
+/**
+ * A compact secondary action: round, 28px, accent-filled while active. The
+ * glyph is a darker shade of the accent when idle (3:1 on its grey disc) and
+ * white or dark on the accent fill when active.
+ */
 export function IconButton({
   icon,
   accent,
@@ -65,29 +79,42 @@ export function IconButton({
   disabled = false,
   onPress,
   accessibilityLabel,
-  accessibilityState,
+  busy,
 }: IconButtonProps) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      hitSlop={8}
-      accessibilityRole="button"
+      hitSlop={ICON_HIT_SLOP}
+      role="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ ...accessibilityState, disabled }}
+      aria-disabled={disabled}
+      aria-busy={busy}
       style={[styles.iconButton, active && { backgroundColor: accent }, disabled && styles.disabled]}>
       <MaterialCommunityIcons
         name={icon}
         size={ICON_SIZE}
-        color={active ? COLORS.white : accent}
+        color={active ? foregroundOn(accent) : accentOn(accent, COLORS.background, MIN_CONTRAST.graphic)}
       />
     </Pressable>
   );
 }
 
-/** Centered block for a screen's loading, empty, invalid and error states. */
-export function StateView({ children }: { children: ReactNode }) {
-  return <View style={styles.stateView}>{children}</View>;
+/**
+ * Centered block for a screen's loading, empty, invalid and error states.
+ * `alert` is announced once when a failure appears, `status` politely (an empty
+ * result). Loading states pass neither: their spinner is the progress
+ * indicator, and nothing is re-announced while data keeps arriving.
+ */
+export function StateView({ children, announce }: { children: ReactNode; announce?: 'alert' | 'status' }) {
+  return (
+    <View
+      style={styles.stateView}
+      role={announce}
+      aria-live={announce === undefined ? undefined : announce === 'alert' ? 'assertive' : 'polite'}>
+      {children}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

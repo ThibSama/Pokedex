@@ -37,12 +37,14 @@ export function PokemonCard({ pokemon, width }: PokemonCardProps) {
       <Pressable
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
-        accessibilityRole="button"
+        // It navigates, so it is a link: Enter follows it on web, as for any link.
+        role="link"
         accessibilityLabel={cardLabel(pokemon)}
         accessibilityHint={t('pokemon.openHint')}
         style={style}>
         <Text style={styles.tileDexNumber}>{formatDexNumber(pokemon.id)}</Text>
-        <Image source={pokemon.sprites.normal} style={styles.tileArtwork} contentFit="contain" />
+        {/* The tile's label already names the Pokémon: the artwork is decorative. */}
+        <Image source={pokemon.sprites.normal} style={styles.tileArtwork} contentFit="contain" accessibilityLabel="" />
         <View style={styles.tileFooter}>
           <Text style={styles.tileName} numberOfLines={1}>
             {name(pokemon)}

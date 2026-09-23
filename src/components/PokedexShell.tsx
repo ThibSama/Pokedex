@@ -9,6 +9,7 @@ import { changeAppLanguage, useAppLanguage } from '@/i18n';
 import { APP_LANGUAGES } from '@/i18n/languages';
 import { COLORS, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
+import { choiceProps, DECORATIVE } from '@/utils/a11y';
 
 /**
  * The Pokédex shell: the red chrome, the header band and the white content sheet
@@ -18,6 +19,17 @@ import { TYPO } from '@/theme/typography';
 
 /** Back button box. Wider than the chevron glyph, so the glyph still lands on the shell margin. */
 const BACK_BUTTON_SIZE = 28;
+/** 28px plus 8px on every side: a 44px target on native. */
+const BACK_HIT_SLOP = 8;
+
+/**
+ * Native touch targets for the 28x24 FR/EN options: 44 tall, and as wide as the
+ * 2px gap between them allows without the two slops overlapping.
+ */
+const LANGUAGE_HIT_SLOP = [
+  { top: 10, bottom: 10, left: 8, right: 1 },
+  { top: 10, bottom: 10, left: 1, right: 8 },
+];
 
 /**
  * Returns to the previous screen, or to `fallback` when this screen was opened
@@ -71,16 +83,16 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
         {hasBack && (
           <Pressable
             onPress={onBack}
-            hitSlop={8}
-            accessibilityRole="button"
+            hitSlop={BACK_HIT_SLOP}
+            role="button"
             accessibilityLabel={t('shell.back')}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.white} />
+            <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.white} {...DECORATIVE} />
           </Pressable>
         )}
-        <MaterialCommunityIcons name="pokeball" size={24} color={COLORS.white} />
+        <MaterialCommunityIcons name="pokeball" size={24} color={COLORS.white} {...DECORATIVE} />
         <View style={styles.titleBlock}>
-          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
+          <Text style={styles.title} numberOfLines={1} role="heading">
             {title}
           </Text>
           {subtitle !== undefined && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -103,16 +115,15 @@ function LanguageSwitch() {
   const language = useAppLanguage();
 
   return (
-    <View style={styles.language} accessibilityRole="radiogroup" accessibilityLabel={t('language.label')}>
-      {APP_LANGUAGES.map((code) => {
+    <View style={styles.language} role="group" aria-label={t('language.label')}>
+      {APP_LANGUAGES.map((code, index) => {
         const selected = code === language;
         return (
           <Pressable
             key={code}
             onPress={() => changeAppLanguage(code)}
-            hitSlop={4}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
+            hitSlop={LANGUAGE_HIT_SLOP[index]}
+            {...choiceProps(selected)}
             accessibilityLabel={t(`language.names.${code}`)}
             accessibilityLanguage={code}
             style={({ pressed }) => [
@@ -189,7 +200,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...TYPO.body2,
-    color: OVERLAY.text,
+    color: COLORS.white,
   },
   trailing: {
     ...TYPO.subtitle2,
@@ -205,7 +216,9 @@ const styles = StyleSheet.create({
     backgroundColor: OVERLAY.fill,
   },
   languageOption: {
-    height: 20,
+    // 24 is the WCAG 2.2 minimum target on web, where hitSlop does not apply;
+    // min- so the pill grows with a larger text size instead of clipping it.
+    minHeight: 24,
     minWidth: 28,
     alignItems: 'center',
     justifyContent: 'center',

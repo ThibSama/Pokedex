@@ -11,6 +11,23 @@ import { COLORS, SHADOW } from '@/theme/tokens';
 export const APP_FRAME_MAX_WIDTH = 480;
 
 /**
+ * One keyboard focus ring for every control on web. React Native styles have no
+ * `:focus-visible`, and the browser default is a thin ring that is hard to see
+ * on the red chrome. Two tones — a white halo inside a dark outline — read on
+ * red (dark 3.2:1, white 5.1:1), on white and on every type accent. Only
+ * keyboard focus matches, so taps and clicks draw nothing. Text inputs are
+ * left alone: the search field paints its own focused border.
+ */
+const FOCUS_RING_CSS = `[tabindex="0"]:focus-visible,a[href]:focus-visible{outline:3px solid ${COLORS.dark};outline-offset:2px;box-shadow:0 0 0 2px ${COLORS.white};}`;
+
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.setAttribute('data-app', 'focus-ring');
+  style.textContent = FOCUS_RING_CSS;
+  document.head.appendChild(style);
+}
+
+/**
  * Width every screen should lay out against.
  *
  * Screens that size their own grid must ask for this rather than

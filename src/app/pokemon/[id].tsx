@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   fetchPokemonDetails,
@@ -20,9 +20,11 @@ import { TypeBadge } from '@/components/TypeBadge';
 import { getTypeColor } from '@/constants/typeColors';
 import { useFavorites } from '@/favorites/FavoritesProvider';
 import { formatDecimal, pickLocalized, usePokemonText } from '@/i18n/pokemonText';
+import { accentOn, foregroundOn } from '@/theme/contrast';
 import { COLORS, MESSAGE, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 import type { PokemonDetails, PokemonStats, SpriteVariant } from '@/types/pokemon';
+import { choiceProps, DECORATIVE, SECTION_HEADING } from '@/utils/a11y';
 import { formatDexNumber } from '@/utils/pokemonList';
 
 /** An error keeps only the technical message; fallback wording is translated at render. */
@@ -47,6 +49,15 @@ const STAT_STAGGER_MS = 80;
  * distribution takes over, so the table never turns into a stretched column.
  */
 const STATS_MAX_HEIGHT = STAT_ROWS.length * 40 + (STAT_ROWS.length - 1) * SPACING.md;
+
+/**
+ * Native touch targets for the 24px Normal/Shiny segments: 44 tall, and only
+ * 1px into the 2px gap between the two so their slops never overlap.
+ */
+const SEGMENT_HIT_SLOP = {
+  first: { top: 10, bottom: 10, left: 2, right: 1 },
+  rest: { top: 10, bottom: 10, left: 1, right: 2 },
+};
 
 const ARTWORK_SIZE = 200;
 const ARTWORK_OVERLAP = 60;
@@ -111,7 +122,7 @@ export default function PokemonDetailScreen() {
       <PokedexScreen>
         <PokedexHeader title={t('detail.fallbackTitle')} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
-          <StateView>
+          <StateView announce="alert">
             <Text style={MESSAGE.error}>{t('detail.invalidId')}</Text>
             <Text style={MESSAGE.muted}>
               {t('detail.invalidIdBody', { value: String(idParam), min: NATIONAL_DEX_MIN, max: NATIONAL_DEX_MAX })}
@@ -141,7 +152,7 @@ export default function PokemonDetailScreen() {
       <PokedexScreen>
         <PokedexHeader title={t('detail.fallbackTitle')} trailing={formatDexNumber(id)} onBack={() => goBack('/pokedex')} />
         <PokedexSurface>
-          <StateView>
+          <StateView announce="alert">
             <Text style={MESSAGE.error}>{t('detail.loadError', { number: formatDexNumber(id) })}</Text>
             <Text style={MESSAGE.muted}>{state.message ?? t('common.unknownError')}</Text>
             <PrimaryButton label={t('common.retry')} onPress={retry} />
@@ -168,6 +179,10 @@ export default function PokemonDetailScreen() {
       : ability.names[language],
   );
   const variantLabel = t(`detail.variant.${effectiveVariant}`);
+  // Type-colored headings are 16px bold — body-size text — so they take a
+  // shade of the accent that reaches 4.5:1 on the white card.
+  const accentText = accentOn(accent);
+  const onAccent = foregroundOn(accent);
 
   return (
     <PokedexScreen>
@@ -183,25 +198,30 @@ export default function PokemonDetailScreen() {
         <View style={styles.hero}>
           <View style={[styles.heroBackdrop, { backgroundColor: accent }]} pointerEvents="none">
             <View style={styles.watermark}>
-              <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color={OVERLAY.watermark} />
+              <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color={OVERLAY.watermark} {...DECORATIVE} />
             </View>
           </View>
           {/* Artwork overlaps the card below; zIndex keeps it painted on top of it. */}
           <View style={styles.heroRow}>
-            <HeroChevron direction="previous" currentId={details.id} />
+            <HeroChevron direction="previous" currentId={details.id} color={onAccent} />
             {spriteUrl ? (
               <Image
                 source={spriteUrl}
                 style={styles.artwork}
                 contentFit="contain"
+                // The one informative image: it names the variant being shown.
+                // On web the label becomes the <img> alt; a role there would land
+                // on expo-image's wrapper as a second, unnamed image.
+                accessible
+                role={Platform.OS === 'web' ? undefined : 'img'}
                 accessibilityLabel={t('detail.artwork', { name, variant: variantLabel })}
               />
             ) : (
               <View style={[styles.artwork, styles.artworkMissing]}>
-                <Text style={MESSAGE.onColor}>{t('detail.noArtwork')}</Text>
+                <Text style={[MESSAGE.onColor, { color: onAccent }]}>{t('detail.noArtwork')}</Text>
               </View>
             )}
-            <HeroChevron direction="next" currentId={details.id} />
+            <HeroChevron direction="next" currentId={details.id} color={onAccent} />
           </View>
         </View>
 
@@ -235,14 +255,16 @@ export default function PokemonDetailScreen() {
                 active={favorite}
                 disabled={!hydrated}
                 onPress={() => toggleFavorite(details.id, effectiveVariant)}
+                // The label itself says add or remove, so no extra selected state.
                 accessibilityLabel={t(favorite ? 'detail.favoriteRemove' : 'detail.favoriteAdd', { name })}
-                accessibilityState={{ selected: favorite }}
               />
             </View>
           </View>
 
           <View style={styles.group}>
-            <Text style={[styles.sectionTitle, { color: accent }]}>{t('detail.about')}</Text>
+            <Text style={[styles.sectionTitle, { color: accentText }]} {...SECTION_HEADING}>
+              {t('detail.about')}
+            </Text>
             <View style={styles.about}>
               <AboutColumn
                 label={t('detail.weight')}
@@ -263,7 +285,9 @@ export default function PokemonDetailScreen() {
           </View>
 
           <View style={[styles.group, styles.statsGroup]}>
-            <Text style={[styles.sectionTitle, { color: accent }]}>{t('detail.baseStats')}</Text>
+            <Text style={[styles.sectionTitle, { color: accentText }]} {...SECTION_HEADING}>
+              {t('detail.baseStats')}
+            </Text>
             <View style={styles.stats}>
               {STAT_ROWS.map((key, index) => (
                 <StatBar
@@ -285,17 +309,27 @@ export default function PokemonDetailScreen() {
 
 /**
  * Previous/next chevron around the hero. Rendered as an invisible spacer at the
- * Dex boundaries so the artwork stays centered.
+ * Dex boundaries so the artwork stays centered. `color` is the foreground that
+ * reads on the hero's accent: white on dark types, dark on light ones.
  */
-function HeroChevron({ direction, currentId }: { direction: 'previous' | 'next'; currentId: number }) {
+function HeroChevron({
+  direction,
+  currentId,
+  color,
+}: {
+  direction: 'previous' | 'next';
+  currentId: number;
+  color: string;
+}) {
   const { t } = useTranslation();
   const targetId = direction === 'previous' ? currentId - 1 : currentId + 1;
   if (!isSupportedDexId(targetId)) return <View style={styles.chevron} />;
   return (
     <Pressable
       onPress={() => goToDexId(targetId)}
+      // 32px plus 8px on every side: a 48px target on native.
       hitSlop={8}
-      accessibilityRole="button"
+      role="button"
       accessibilityLabel={t(direction === 'previous' ? 'detail.previous' : 'detail.next', {
         number: formatDexNumber(targetId),
       })}
@@ -303,7 +337,8 @@ function HeroChevron({ direction, currentId }: { direction: 'previous' | 'next';
       <MaterialCommunityIcons
         name={direction === 'previous' ? 'chevron-left' : 'chevron-right'}
         size={32}
-        color={COLORS.white}
+        color={color}
+        {...DECORATIVE}
       />
     </Pressable>
   );
@@ -324,23 +359,27 @@ function Segmented<T extends string>({
 }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.segmented} accessibilityRole="radiogroup" accessibilityLabel={accessibilityLabel}>
-      {options.map((option) => {
+    <View style={styles.segmented} role="group" aria-label={accessibilityLabel}>
+      {options.map((option, index) => {
         const selected = option.key === value;
         return (
           <Pressable
             key={option.key}
             onPress={() => onChange(option.key)}
             disabled={option.disabled}
-            accessibilityRole="button"
-            accessibilityState={{ selected, disabled: option.disabled ?? false }}
+            hitSlop={index === 0 ? SEGMENT_HIT_SLOP.first : SEGMENT_HIT_SLOP.rest}
+            {...choiceProps(selected)}
+            aria-disabled={option.disabled ?? false}
             accessibilityLabel={t('detail.segmentOption', { group: accessibilityLabel, option: option.label })}
             style={[
               styles.segment,
               selected && { backgroundColor: accent },
               option.disabled && styles.disabled,
             ]}>
-            <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{option.label}</Text>
+            {/* Selected also reads bolder, not only filled with the accent. */}
+            <Text style={[styles.segmentText, selected && styles.segmentTextSelected, selected && { color: foregroundOn(accent) }]}>
+              {option.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -362,7 +401,9 @@ function AboutColumn({
       <View style={styles.aboutValues}>
         {lines.map((line) => (
           <View key={line} style={styles.aboutValueRow}>
-            {icon !== undefined && <MaterialCommunityIcons name={icon} size={14} color={COLORS.dark} />}
+            {icon !== undefined && (
+              <MaterialCommunityIcons name={icon} size={14} color={COLORS.dark} {...DECORATIVE} />
+            )}
             <Text style={styles.aboutValue}>{line}</Text>
           </View>
         ))}
@@ -453,7 +494,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   segment: {
-    height: 24,
+    // min-: grows with a larger text size instead of clipping the label.
+    minHeight: 24,
     justifyContent: 'center',
     paddingHorizontal: 10,
     // 24px tall, so the pill radius is what the segment already rendered as.
@@ -465,7 +507,6 @@ const styles = StyleSheet.create({
   },
   segmentTextSelected: {
     ...TYPO.subtitle3,
-    color: COLORS.white,
   },
   disabled: {
     opacity: OPACITY.disabled,

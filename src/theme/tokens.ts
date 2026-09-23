@@ -28,16 +28,14 @@ export const COLORS = {
 } as const;
 
 /**
- * Translucent white layers painted over a colored surface — the red chrome or a
- * type accent. Kept together because they only work as a set: a fill that is too
- * light swallows the white text sitting on it.
+ * Translucent layers painted over a colored surface — the red chrome or a type
+ * accent. Text on the red chrome is always opaque white (5.1:1): a translucent
+ * white would drop below 4.5:1, and so does white text on a fill much lighter than this one.
  */
 export const OVERLAY = {
-  /** Fill behind white text: filter chips, counters. */
-  fill: withAlpha(COLORS.white, 0.2),
-  /** Secondary text on a colored surface. */
-  text: withAlpha(COLORS.white, 0.85),
-  /** The oversized Pokéball watermark behind a hero. */
+  /** Track behind white text on the red chrome (the language switch). 20% gave 4.2:1; 12% gives 4.6:1. */
+  fill: withAlpha(COLORS.white, 0.12),
+  /** The oversized Pokéball watermark behind a hero. Decorative. */
   watermark: withAlpha(COLORS.white, 0.12),
 } as const;
 
@@ -119,6 +117,6 @@ export const MESSAGE = {
   muted: { ...TYPO.body2, color: COLORS.medium, textAlign: 'center' },
   /** The failure itself: red, because red is the app's signal color. */
   error: { ...TYPO.subtitle1, color: COLORS.red, textAlign: 'center' },
-  /** Neutral explanation painted on the red chrome or a type accent. */
-  onColor: { ...TYPO.body2, color: OVERLAY.text, textAlign: 'center' },
+  /** Explanation painted on a type accent; the color comes from `foregroundOn(accent)`. */
+  onColor: { ...TYPO.body2, textAlign: 'center' },
 } as const satisfies Record<string, TextStyle>;
