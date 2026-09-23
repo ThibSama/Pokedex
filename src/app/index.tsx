@@ -66,7 +66,7 @@ const EMPTY_COLLECTION_HERO_ID = (Math.floor(
 ) + 1) as NationalDexId;
 
 /**
- * The stage the featured Pokémon stands on: a square area, with the soft disc
+ * The stage the hero Pokémon stands on: a square area, with the soft disc
  * and its Pokéball watermark drawn behind the artwork at `STAGE_SIZE` minus the
  * stage margin on every side.
  */
@@ -151,7 +151,7 @@ export default function HomeScreen() {
 
   const favoriteCount = favoriteIds.length;
   // The hero is shown as it was saved: a shiny favorite shows its shiny
-  // artwork, and #197 — which is nobody's favorite — stays Normal.
+  // artwork; anything else stays Normal.
   const heroVariant: SpriteVariant =
     state.status === "success"
       ? (getFavorite(state.pokemon.id)?.variant ?? "normal")
@@ -174,7 +174,7 @@ export default function HomeScreen() {
       />
 
       {/* Home is a screen inside the Pokédex, not a separate page: the white
-          sheet is the room the featured Pokémon stands in, and the shortcuts
+          sheet is the room the hero Pokémon stands in, and the shortcuts
           sit under it. */}
       <PokedexSurface>
         <ScrollView
@@ -278,7 +278,7 @@ export default function HomeScreen() {
 
 /**
  * The stage: a soft disc with the brand's Pokéball watermark, and whatever
- * stands on it — the featured artwork, a spinner, or nothing for an empty state.
+ * stands on it — the hero artwork, a spinner, or nothing for an empty state.
  * The artwork is deliberately larger than the disc so the Pokémon reads as
  * present in the room rather than contained by a card.
  */

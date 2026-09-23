@@ -36,8 +36,8 @@ const fr = {
     title: "Pokédex",
     subtitle: "Johto & Kanto · {{count}} Pokémon",
     loadingHero: "Chargement du Pokémon…",
-    heroError: "Impossible de charger la vedette.",
-    heroRetryLabel: "Réessayer de charger le Pokémon vedette",
+    heroError: "Impossible de charger le Pokémon.",
+    heroRetryLabel: "Réessayer de charger le Pokémon",
     viewEntry: "Voir la fiche",
     pokedexCard: {
       title: "Pokédex",

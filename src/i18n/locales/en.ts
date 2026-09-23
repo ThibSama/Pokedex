@@ -28,8 +28,8 @@ const en: LocaleResource = {
     title: "Pokédex",
     subtitle: "Kanto & Johto · {{count}} Pokémon",
     loadingHero: "Loading Pokémon…",
-    heroError: "Couldn’t load the featured Pokémon.",
-    heroRetryLabel: "Retry loading the featured Pokémon",
+    heroError: "Couldn’t load the Pokémon.",
+    heroRetryLabel: "Retry loading the Pokémon",
     viewEntry: "View entry",
     pokedexCard: {
       title: "Pokédex",

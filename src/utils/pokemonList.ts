@@ -84,11 +84,6 @@ export function applyListOptions(
   return sortPokemon(filtered, sort, language);
 }
 
-/** Distinct type names present in `items`, alphabetically. */
-export function collectTypes(items: readonly PokemonSummary[]): string[] {
-  return [...new Set(items.flatMap((pokemon) => pokemon.types))].sort();
-}
-
 /** Append `incoming` to `existing`, skipping IDs already present. */
 export function mergeUnique(
   existing: readonly PokemonSummary[],
