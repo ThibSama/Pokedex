@@ -9,6 +9,9 @@ import { useTranslation } from "react-i18next";
 import { getPokemonCryUrl } from "@/api/pokemonAudio";
 import { IconButton } from "@/components/Controls";
 
+/** Playback volume for Pokémon cries: 0.0–1.0. */
+const CRY_VOLUME = 0.05;
+
 /** Configure the audio session once per app run, so cries play in iOS silent mode. */
 let audioModeConfigured = false;
 
@@ -34,7 +37,6 @@ export function CryButton({ apiName, name, accent }: CryButtonProps) {
   const url = getPokemonCryUrl(apiName);
   const player = useAudioPlayer(url);
   const status = useAudioPlayerStatus(player);
-  const CRY_VOLUME = 0.05;
   // Keyed by name so a new Pokémon gets a fresh chance without an effect.
   const [failedFor, setFailedFor] = useState<string | null>(null);
 
@@ -52,8 +54,12 @@ export function CryButton({ apiName, name, accent }: CryButtonProps) {
 
   async function playCry() {
     try {
-      // Rewind first so a tap after the cry ended replays it from the start.
+      // AudioPlayer is an imperative Expo object whose documented API exposes
+      // volume as a mutable property.
+      // eslint-disable-next-line react-hooks/immutability
       player.volume = CRY_VOLUME;
+
+      // Rewind first so a tap after the cry ended replays it from the start.
       await player.seekTo(0);
       player.play();
     } catch {
