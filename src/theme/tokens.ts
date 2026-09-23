@@ -45,6 +45,8 @@ export interface Palette {
   textMuted: string;
   /** Brand red as text or a glyph on a sheet: errors, spinners, the idle sort icons. */
   accent: string;
+  /** Decorative Pokéball watermark painted straight on a sheet (the Home hero). */
+  watermark: string;
   /** Web only: the viewport around the centered app column, and the column itself. */
   backdrop: string;
   frame: string;
@@ -67,6 +69,7 @@ export const PALETTES: Record<ThemeMode, Palette> = {
     text: '#212121',
     textMuted: '#666666',
     accent: BRAND.red,
+    watermark: '#E4E4E4',
     backdrop: '#E0E0E0',
     frame: '#EFEFEF',
   },
@@ -81,6 +84,7 @@ export const PALETTES: Record<ThemeMode, Palette> = {
     textMuted: '#A8A8A8',
     // Brand red reads 3.7:1 on the dark sheet; this lift of it reaches 4.5:1 on every dark fill.
     accent: '#FF6B7D',
+    watermark: '#2C2C2C',
     backdrop: '#0A0A0A',
     frame: '#121212',
   },
@@ -104,7 +108,7 @@ export const INK = {
 export const OVERLAY = {
   /** Track behind white text on the red chrome (the language switch). 20% gave 4.2:1; 12% gives 4.6:1. */
   fill: withAlpha(BRAND.white, 0.12),
-  /** The oversized Pokéball watermark behind a hero. Decorative. */
+  /** The oversized Pokéball watermark on the detail hero's type accent. Decorative. */
   watermark: withAlpha(BRAND.white, 0.12),
 } as const;
 

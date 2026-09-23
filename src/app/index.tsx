@@ -35,7 +35,7 @@ import { usePokemonText } from "@/i18n/pokemonText";
 import { accentOn, MIN_CONTRAST } from "@/theme/contrast";
 import { useMessageStyles } from "@/theme/messages";
 import { createThemedStyles, useTheme } from "@/theme/ThemeProvider";
-import { BRAND, OPACITY, OVERLAY, RADIUS, SPACING } from "@/theme/tokens";
+import { BRAND, OPACITY, RADIUS, SPACING } from "@/theme/tokens";
 import { TYPO } from "@/theme/typography";
 import type {
   NationalDexId,
@@ -60,12 +60,13 @@ const EMPTY_COLLECTION_HERO_ID = (Math.floor(
 ) + 1) as NationalDexId;
 
 /**
- * The stage the hero Pokémon stands on: a square area, with the soft disc
- * and its Pokéball watermark drawn behind the artwork at `STAGE_SIZE` minus the
- * stage margin on every side.
+ * The stage the hero Pokémon stands on: a square area, with the Pokéball
+ * watermark centered behind the artwork at `STAGE_SIZE` minus the stage margin
+ * on every side.
  */
 const STAGE_SIZE = 220;
 const STAGE_MARGIN = SPACING.lg;
+const WATERMARK_SIZE = STAGE_SIZE - 2 * STAGE_MARGIN;
 
 function pickRandom(ids: readonly NationalDexId[]): NationalDexId {
   return ids[Math.floor(Math.random() * ids.length)];
@@ -274,24 +275,23 @@ export default function HomeScreen() {
 }
 
 /**
- * The stage: a soft disc with the brand's Pokéball watermark, and whatever
- * stands on it — the hero artwork, a spinner, or nothing for an empty state.
- * The artwork is deliberately larger than the disc so the Pokémon reads as
- * present in the room rather than contained by a card.
+ * The stage: the brand's Pokéball watermark, painted straight on the sheet in
+ * the theme's watermark gray, and whatever stands on it — the hero artwork, a
+ * spinner, or nothing for an empty state. The artwork is deliberately larger
+ * than the watermark so the Pokémon reads as present in the room rather than
+ * contained by a card.
  */
 function Stage({ children }: { children?: ReactNode }) {
   const styles = useStyles();
+  const { palette } = useTheme();
   return (
     <View style={styles.stage}>
-      <View style={styles.disc} pointerEvents="none">
-        <View style={styles.discWatermark}>
-          <MaterialCommunityIcons
-            name="pokeball"
-            size={STAGE_SIZE}
-            color={OVERLAY.watermark}
-            {...DECORATIVE}
-          />
-        </View>
+      <View style={styles.watermark} pointerEvents="none" {...DECORATIVE}>
+        <MaterialCommunityIcons
+          name="pokeball"
+          size={WATERMARK_SIZE}
+          color={palette.watermark}
+        />
       </View>
       {children}
     </View>
@@ -387,20 +387,14 @@ const useStyles = createThemedStyles((c) => ({
     alignItems: "center",
     justifyContent: "center",
   },
-  disc: {
+  watermark: {
     position: "absolute",
     top: STAGE_MARGIN,
     left: STAGE_MARGIN,
     right: STAGE_MARGIN,
     bottom: STAGE_MARGIN,
-    borderRadius: RADIUS.pill,
-    backgroundColor: c.surfaceMuted,
-    overflow: "hidden",
-  },
-  discWatermark: {
-    position: "absolute",
-    top: -24,
-    right: -24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   artwork: {
     width: STAGE_SIZE,
