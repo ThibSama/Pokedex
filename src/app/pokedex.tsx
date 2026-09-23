@@ -1,5 +1,5 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,34 +12,58 @@ import {
   TextInput,
   View,
   type TextStyle,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DEFAULT_BATCH_SIZE, fetchPokemonBatch, NATIONAL_DEX_TOTAL } from '@/api/pokeApi';
-import { APP_FRAME_MAX_WIDTH, useFrameWidth } from '@/components/AppShell';
-import { PrimaryButton, StateView } from '@/components/Controls';
-import { goBack, PokedexHeader, PokedexScreen, PokedexSurface } from '@/components/PokedexShell';
-import { PokemonCard } from '@/components/PokemonCard';
-import { getTypeColor, TYPE_NAMES } from '@/constants/typeColors';
-import { COLORS, MESSAGE, OPACITY, RADIUS, SCRIM, SHADOW, SHELL, SPACING } from '@/theme/tokens';
-import { FONT_FAMILY, TYPO } from '@/theme/typography';
-import type { PokemonSummary } from '@/types/pokemon';
-import { GRID_GAP, gridTileWidth } from '@/utils/grid';
 import {
-  DEFAULT_LIST_OPTIONS,
+  DEFAULT_BATCH_SIZE,
+  fetchPokemonBatch,
+  NATIONAL_DEX_TOTAL,
+} from "@/api/pokeApi";
+import { APP_FRAME_MAX_WIDTH, useFrameWidth } from "@/components/AppShell";
+import { PrimaryButton, StateView } from "@/components/Controls";
+import {
+  goBack,
+  PokedexHeader,
+  PokedexScreen,
+  PokedexSurface,
+} from "@/components/PokedexShell";
+import { PokemonCard } from "@/components/PokemonCard";
+import { getTypeColor, TYPE_NAMES } from "@/constants/typeColors";
+import {
+  COLORS,
+  MESSAGE,
+  OPACITY,
+  RADIUS,
+  SCRIM,
+  SHADOW,
+  SHELL,
+  SPACING,
+} from "@/theme/tokens";
+import { FONT_FAMILY, TYPO } from "@/theme/typography";
+import type { PokemonSummary } from "@/types/pokemon";
+import { GRID_GAP, gridTileWidth } from "@/utils/grid";
+import {
   applyListOptions,
+  DEFAULT_LIST_OPTIONS,
   mergeUnique,
   type ListOptions,
   type SortMode,
-} from '@/utils/pokemonList';
+} from "@/utils/pokemonList";
 
-type LoadStatus = 'loading' | 'loadingMore' | 'idle' | 'error';
+type LoadStatus = "loading" | "loadingMore" | "idle" | "error";
 
-const SORT_LABELS: Record<SortMode, string> = { dex: 'numéro du Pokédex', name: 'nom' };
+const SORT_LABELS: Record<SortMode, string> = {
+  dex: "numéro du Pokédex",
+  name: "nom",
+};
 /** Icon-only sort control: the glyph itself says which order is active. */
-const SORT_ICONS: Record<SortMode, 'sort-numeric-variant' | 'sort-alphabetical-variant'> = {
-  dex: 'sort-numeric-variant',
-  name: 'sort-alphabetical-variant',
+const SORT_ICONS: Record<
+  SortMode,
+  "sort-numeric-variant" | "sort-alphabetical-variant"
+> = {
+  dex: "sort-numeric-variant",
+  name: "sort-alphabetical-variant",
 };
 const SORT_MODES = Object.keys(SORT_ICONS) as SortMode[];
 
@@ -54,7 +78,9 @@ const COLUMNS = 3;
  * the value is widened. Web only, so native never sees it.
  */
 const WEB_FOCUS_RING_RESET: TextStyle =
-  Platform.OS === 'web' ? { outlineStyle: 'none' as string as TextStyle['outlineStyle'] } : {};
+  Platform.OS === "web"
+    ? { outlineStyle: "none" as string as TextStyle["outlineStyle"] }
+    : {};
 
 /** Content box the grid lays out in, inside the red shell and the white sheet. */
 function gridContentWidth(frameWidth: number): number {
@@ -69,7 +95,7 @@ export default function PokedexListScreen() {
   const [items, setItems] = useState<PokemonSummary[]>([]);
   const [nextOffset, setNextOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [status, setStatus] = useState<LoadStatus>('loading');
+  const [status, setStatus] = useState<LoadStatus>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [options, setOptions] = useState<ListOptions>(DEFAULT_LIST_OPTIONS);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -90,12 +116,14 @@ export default function PokedexListScreen() {
         setItems((current) => mergeUnique(current, batch.items));
         setNextOffset(offset + batch.items.length);
         setHasMore(batch.hasMore);
-        setStatus('idle');
+        setStatus("idle");
       })
       .catch((error: unknown) => {
         if (!mounted.current) return;
-        setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
-        setStatus('error');
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unknown error",
+        );
+        setStatus("error");
       })
       .finally(() => {
         inFlight.current = false;
@@ -113,7 +141,7 @@ export default function PokedexListScreen() {
   const startLoad = useCallback(
     (offset: number) => {
       if (inFlight.current) return;
-      setStatus(offset === 0 ? 'loading' : 'loadingMore');
+      setStatus(offset === 0 ? "loading" : "loadingMore");
       setErrorMessage(null);
       loadPage(offset);
     },
@@ -130,11 +158,20 @@ export default function PokedexListScreen() {
    * for good once the component unmounts.
    */
   useEffect(() => {
-    if (!mounted.current || !hasMore || status !== 'idle' || errorMessage !== null) return;
+    if (
+      !mounted.current ||
+      !hasMore ||
+      status !== "idle" ||
+      errorMessage !== null
+    )
+      return;
     startLoad(nextOffset);
   }, [errorMessage, hasMore, nextOffset, startLoad, status]);
 
-  const retry = useCallback(() => startLoad(nextOffset), [startLoad, nextOffset]);
+  const retry = useCallback(
+    () => startLoad(nextOffset),
+    [startLoad, nextOffset],
+  );
 
   const chooseType = (type: string | null) => {
     setOptions((o) => ({ ...o, type }));
@@ -142,20 +179,34 @@ export default function PokedexListScreen() {
   };
 
   // Search/sort/filter are derived purely from client state — no network involved.
-  const visible = useMemo(() => applyListOptions(items, options), [items, options]);
-  const cardWidth = useMemo(() => gridTileWidth(gridContentWidth(width), COLUMNS), [width]);
+  const visible = useMemo(
+    () => applyListOptions(items, options),
+    [items, options],
+  );
+  const cardWidth = useMemo(
+    () => gridTileWidth(gridContentWidth(width), COLUMNS),
+    [width],
+  );
 
-  const isInitialLoading = status === 'loading' && items.length === 0;
-  const isInitialError = status === 'error' && items.length === 0;
+  const isInitialLoading = status === "loading" && items.length === 0;
+  const isInitialError = status === "error" && items.length === 0;
   const selectedType = options.type;
 
   return (
     <PokedexScreen>
       {/* One coherent red header area: back, title, search, sort and the type filter. */}
-      <PokedexHeader title="Pokédex" onBack={() => goBack('/')}>
+      <PokedexHeader title="Pokédex" onBack={() => goBack("/")}>
         <View style={styles.controlsRow}>
-          <View style={[styles.searchField, searchFocused && styles.searchFieldFocused]}>
-            <MaterialCommunityIcons name="magnify" size={18} color={COLORS.red} />
+          <View
+            style={[
+              styles.searchField,
+              searchFocused && styles.searchFieldFocused,
+            ]}>
+            <MaterialCommunityIcons
+              name="magnify"
+              size={18}
+              color={COLORS.red}
+            />
             <TextInput
               value={options.query}
               onChangeText={(query) => setOptions((o) => ({ ...o, query }))}
@@ -205,17 +256,35 @@ export default function PokedexListScreen() {
             accessibilityRole="button"
             accessibilityState={{ expanded: filterOpen }}
             accessibilityLabel={
-              selectedType === null ? 'Filtrer par type, tous les types' : `Filtrer par type, ${selectedType}`
+              selectedType === null
+                ? "Filtrer par type, tous les types"
+                : `Filtrer par type, ${selectedType}`
             }
-            style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name="filter-variant" size={16} color={COLORS.red} />
+            style={({ pressed }) => [
+              styles.filterButton,
+              pressed && styles.pressed,
+            ]}>
+            <MaterialCommunityIcons
+              name="filter-variant"
+              size={16}
+              color={COLORS.red}
+            />
             {selectedType !== null && (
-              <View style={[styles.filterDot, { backgroundColor: getTypeColor(selectedType) }]} />
+              <View
+                style={[
+                  styles.filterDot,
+                  { backgroundColor: getTypeColor(selectedType) },
+                ]}
+              />
             )}
             <Text style={styles.filterLabel} numberOfLines={1}>
-              {selectedType ?? 'Tous'}
+              {selectedType ?? "Tous"}
             </Text>
-            <MaterialCommunityIcons name="chevron-down" size={16} color={COLORS.red} />
+            <MaterialCommunityIcons
+              name="chevron-down"
+              size={16}
+              color={COLORS.red}
+            />
           </Pressable>
         </View>
       </PokedexHeader>
@@ -228,7 +297,9 @@ export default function PokedexListScreen() {
           </StateView>
         ) : isInitialError ? (
           <StateView>
-            <Text style={MESSAGE.error}>Impossible de charger les Pokémon.</Text>
+            <Text style={MESSAGE.error}>
+              Impossible de charger les Pokémon.
+            </Text>
             <Text style={MESSAGE.muted}>{errorMessage}</Text>
             <PrimaryButton label="Réessayer" onPress={retry} />
           </StateView>
@@ -238,13 +309,17 @@ export default function PokedexListScreen() {
             key={`grid-${COLUMNS}`}
             numColumns={COLUMNS}
             keyExtractor={(item) => String(item.id)}
-            renderItem={({ item }) => <PokemonCard pokemon={item} width={cardWidth} />}
+            renderItem={({ item }) => (
+              <PokemonCard pokemon={item} width={cardWidth} />
+            )}
             contentContainerStyle={styles.list}
             columnWrapperStyle={styles.column}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <StateView>
-                <Text style={MESSAGE.muted}>Aucun Pokémon chargé ne correspond.</Text>
+                <Text style={MESSAGE.muted}>
+                  Aucun Pokémon chargé ne correspond.
+                </Text>
               </StateView>
             }
             ListFooterComponent={
@@ -266,24 +341,32 @@ export default function PokedexListScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setFilterOpen(false)}>
-        <Pressable
-          style={styles.filterBackdrop}
-          onPress={() => setFilterOpen(false)}
-          accessibilityRole="button"
-          accessibilityLabel="Fermer le sélecteur de type">
-          {/* Taps on the panel itself are swallowed, so only the backdrop closes it. */}
+        <View style={styles.filterBackdrop}>
           <Pressable
-            style={[styles.filterPanel, { paddingBottom: insets.bottom + SPACING.lg }]}
-            onPress={noop}
+            style={StyleSheet.absoluteFill}
+            onPress={() => setFilterOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer le sélecteur de type"
+          />
+
+          <View
+            style={[
+              styles.filterPanel,
+              { paddingBottom: insets.bottom + SPACING.lg },
+            ]}
             accessibilityViewIsModal>
             <Text style={styles.filterPanelTitle}>Type</Text>
-            <ScrollView contentContainerStyle={styles.filterOptions} showsVerticalScrollIndicator={false}>
+
+            <ScrollView
+              contentContainerStyle={styles.filterOptions}
+              showsVerticalScrollIndicator={false}>
               <FilterOption
                 label="Tous"
                 color={null}
                 selected={selectedType === null}
                 onPress={() => chooseType(null)}
               />
+
               {TYPE_NAMES.map((type) => (
                 <FilterOption
                   key={type}
@@ -294,8 +377,8 @@ export default function PokedexListScreen() {
                 />
               ))}
             </ScrollView>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </PokedexScreen>
   );
@@ -323,16 +406,23 @@ function FilterOption({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={label === 'Tous' ? 'Tous les types' : `Type ${label}`}
+      accessibilityLabel={label === "Tous" ? "Tous les types" : `Type ${label}`}
       style={({ pressed }) => [
         styles.option,
         selected && { backgroundColor: color ?? COLORS.red },
         pressed && styles.pressed,
       ]}>
       {color !== null && (
-        <View style={[styles.optionDot, { backgroundColor: selected ? COLORS.white : color }]} />
+        <View
+          style={[
+            styles.optionDot,
+            { backgroundColor: selected ? COLORS.white : color },
+          ]}
+        />
       )}
-      <Text style={[styles.optionText, selected && styles.optionTextSelected]} numberOfLines={1}>
+      <Text
+        style={[styles.optionText, selected && styles.optionTextSelected]}
+        numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -352,7 +442,7 @@ function ListFooter({
   errorMessage: string | null;
   onRetry: () => void;
 }) {
-  if (status === 'loadingMore') {
+  if (status === "loadingMore") {
     return (
       <View style={styles.footer} accessibilityRole="progressbar">
         <ActivityIndicator color={COLORS.red} />
@@ -362,7 +452,7 @@ function ListFooter({
       </View>
     );
   }
-  if (status === 'error') {
+  if (status === "error") {
     return (
       <View style={styles.footer}>
         <Text style={MESSAGE.error}>Échec du chargement.</Text>
@@ -374,7 +464,9 @@ function ListFooter({
   if (!hasMore) {
     return (
       <View style={styles.footer}>
-        <Text style={MESSAGE.muted}>Fin du Pokédex — {loadedCount} Pokémon chargés.</Text>
+        <Text style={MESSAGE.muted}>
+          Fin du Pokédex — {loadedCount} Pokémon chargés.
+        </Text>
       </View>
     );
   }
@@ -391,22 +483,22 @@ function ListFooter({
 
 const styles = StyleSheet.create({
   controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACING.sm,
     paddingHorizontal: SHELL.headerPadding,
   },
   searchField: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACING.sm,
     height: 40,
     borderRadius: RADIUS.field,
     // The focused state is this border; it is reserved (transparent) so nothing
     // moves when the field takes focus.
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: "transparent",
     paddingHorizontal: SPACING.md - 2,
     backgroundColor: COLORS.white,
     ...SHADOW.float,
@@ -422,8 +514,8 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
   },
   sortGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: SPACING.xs,
     height: 40,
     borderRadius: RADIUS.field,
@@ -435,20 +527,20 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: RADIUS.card,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   sortButtonSelected: {
     backgroundColor: COLORS.red,
   },
   filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: SHELL.headerPadding,
   },
   filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     height: 32,
     paddingHorizontal: SPACING.md,
@@ -464,19 +556,19 @@ const styles = StyleSheet.create({
   filterLabel: {
     ...TYPO.subtitle3,
     color: COLORS.dark,
-    textTransform: 'capitalize',
+    textTransform: "capitalize",
   },
   filterBackdrop: {
     flex: 1,
     backgroundColor: SCRIM,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    justifyContent: "flex-end",
+    alignItems: "center",
   },
   filterPanel: {
-    width: '100%',
+    width: "100%",
     // The web frame caps the app at a phone width; the panel follows it.
     maxWidth: APP_FRAME_MAX_WIDTH,
-    maxHeight: '75%',
+    maxHeight: "75%",
     paddingTop: SPACING.lg,
     borderTopLeftRadius: RADIUS.card,
     borderTopRightRadius: RADIUS.card,
@@ -489,17 +581,17 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
   },
   filterOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: SPACING.sm,
     paddingHorizontal: SPACING.lg,
   },
   option: {
     flexGrow: 1,
-    flexBasis: '45%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexBasis: "45%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     height: 40,
     paddingHorizontal: SPACING.sm,
@@ -514,7 +606,7 @@ const styles = StyleSheet.create({
   optionText: {
     ...TYPO.body2,
     color: COLORS.dark,
-    textTransform: 'capitalize',
+    textTransform: "capitalize",
   },
   optionTextSelected: {
     ...TYPO.subtitle2,
@@ -530,7 +622,7 @@ const styles = StyleSheet.create({
     gap: GRID_GAP,
   },
   footer: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: SPACING.sm,
     paddingVertical: SPACING.lg,
   },
