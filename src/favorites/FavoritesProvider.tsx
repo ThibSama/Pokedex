@@ -5,51 +5,36 @@ import { loadFavorites, saveFavorites } from '@/storage/favoritesStorage';
 import type { FavoritePokemon, NationalDexId, SpriteVariant } from '@/types/pokemon';
 
 interface FavoritesContextValue {
-  /** False until persisted favorites have been read once. */
+  /** Faux tant que les favoris stockés n'ont pas été lus. */
   hydrated: boolean;
-  /** Full favorite records in insertion order (oldest first). */
+  /** Ordre d'insertion, du plus ancien au plus récent. */
   favoriteEntries: FavoritePokemon[];
-  /** The same records as bare ids, for selection and fetch logic. */
   favoriteIds: NationalDexId[];
-  /** The stored favorite for `id`, or undefined when it is not a favorite. */
   getFavorite: (id: number) => FavoritePokemon | undefined;
   isFavorite: (id: number) => boolean;
-  /**
-   * `variant` is only read when the Pokémon is not a favorite yet: it is what
-   * the user had selected at that moment. Adding an existing favorite is a
-   * no-op, so a later Normal/Shiny change never rewrites the stored variant.
-   */
+  /** `variant` n'est lu qu'au premier ajout : un favori existant garde sa variante stockée. */
   addFavorite: (id: number, variant?: SpriteVariant) => void;
-  /** Membership removal; the whole record goes, variant included. */
   removeFavorite: (id: number) => void;
   toggleFavorite: (id: number, variant?: SpriteVariant) => void;
 }
 
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
-/**
- * Holds the favorite records and mirrors every change to AsyncStorage.
- *
- * Only the Dex id and the chosen artwork variant are persisted; names, sprites
- * and types are always re-fetched from PokéAPI. Writes are chained so two quick
- * toggles cannot land out of order.
- */
+// Seuls l'id et la variante sont persistés ; le reste est rechargé depuis PokéAPI.
 export function FavoritesProvider({ children }: { children: ReactNode }) {
   const [favoriteEntries, setFavoriteEntries] = useState<FavoritePokemon[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
-  // Mirrors `favoriteEntries` so a mutation reads the latest value without
-  // depending on a re-render having happened first.
+  // Miroir de `favoriteEntries` : une mutation lit la dernière valeur sans attendre de re-rendu.
   const entriesRef = useRef<FavoritePokemon[]>([]);
-  // Serializes writes: each save waits for the previous one to settle, so the
-  // last mutation is always the last thing written.
+  // Sérialise les écritures : la dernière mutation est toujours la dernière écrite.
   const writeChain = useRef<Promise<void>>(Promise.resolve());
 
   const enqueueWrite = useCallback((next: FavoritePokemon[]) => {
     writeChain.current = writeChain.current.then(() =>
       saveFavorites(next).catch(() => {
-        // Storage failure must not crash the UI; memory stays authoritative
-        // for this session and the next successful write repairs the payload.
+        // Un échec de stockage ne doit pas casser l'UI : la mémoire fait foi et la
+        // prochaine écriture réussie répare les données.
       }),
     );
   }, []);
@@ -61,8 +46,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
       entriesRef.current = entries;
       setFavoriteEntries(entries);
       setHydrated(true);
-      // A v1 collection is rewritten in the current schema once, through the
-      // same chain as every other write, so it lands in order.
+      // Une collection v1 est réécrite une fois au schéma actuel, via la même chaîne.
       if (migratedFromV1) enqueueWrite(entries);
     });
     return () => {
@@ -81,7 +65,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
 
   const addFavorite = useCallback(
     (id: number, variant: SpriteVariant = 'normal') => {
-      // Ignore mutations before hydration, which would overwrite stored entries with [].
+      // Ignoré avant hydratation, sinon le stockage serait écrasé par [].
       if (!hydrated || !isSupportedDexId(id) || entriesRef.current.some((entry) => entry.id === id)) return;
       commit([...entriesRef.current, { id, variant }]);
     },

@@ -29,13 +29,11 @@ import type { PokemonDetails, PokemonStats, SpriteVariant } from '@/types/pokemo
 import { choiceProps, DECORATIVE, SECTION_HEADING } from '@/utils/a11y';
 import { formatDexNumber } from '@/utils/pokemonList';
 
-/** An error keeps only the technical message; fallback wording is translated at render. */
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string | null }
   | { status: 'success'; details: PokemonDetails };
 
-/** Figma order; the labels come from the `stats` resources. */
 const STAT_ROWS: readonly (keyof PokemonStats)[] = [
   'hp',
   'attack',
@@ -46,16 +44,11 @@ const STAT_ROWS: readonly (keyof PokemonStats)[] = [
 ];
 const STAT_STAGGER_MS = 80;
 
-/**
- * How tall the stats table may grow on a tall screen. Past this the card's own
- * distribution takes over, so the table never turns into a stretched column.
- */
+// Au-delà, la carte répartit elle-même la hauteur : le tableau ne s'étire pas.
 const STATS_MAX_HEIGHT = STAT_ROWS.length * 40 + (STAT_ROWS.length - 1) * SPACING.md;
 
-/**
- * Native touch targets for the 24px Normal/Shiny segments: 44 tall, and only
- * 1px into the 2px gap between the two so their slops never overlap.
- */
+// hitSlop natif : 44px de haut, et 1px seulement dans l'écart de 2px pour que
+// les zones des deux segments ne se chevauchent pas.
 const SEGMENT_HIT_SLOP = {
   first: { top: 10, bottom: 10, left: 2, right: 1 },
   rest: { top: 10, bottom: 10, left: 1, right: 2 },
@@ -63,10 +56,8 @@ const SEGMENT_HIT_SLOP = {
 
 const ARTWORK_SIZE = 200;
 const ARTWORK_OVERLAP = 60;
-/** Figma hero watermark: an oversized, barely-there Pokéball behind the artwork. */
 const WATERMARK_SIZE = 208;
 
-/** Parse the route param into a supported Dex id, or null when invalid. */
 function parseDexId(param: string | string[] | undefined): number | null {
   const raw = Array.isArray(param) ? param[0] : param;
   if (raw === undefined || !/^\d+$/.test(raw)) return null;
@@ -74,7 +65,7 @@ function parseDexId(param: string | string[] | undefined): number | null {
   return isSupportedDexId(id) ? id : null;
 }
 
-/** Swap the current entry rather than stacking one screen per neighbour visited. */
+// replace plutôt que push : on n'empile pas un écran par voisin visité.
 function goToDexId(id: number) {
   router.replace({ pathname: '/pokemon/[id]', params: { id } });
 }
@@ -92,10 +83,8 @@ export default function PokemonDetailScreen() {
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  // Local UI state only: switches between already-fetched data, never refetches.
-  // A route variant (the Home hero, a Collection slot) opens the screen on that
-  // presentation; anything else — including the plain Pokédex list — is Normal.
-  // Independent of the app language, which is global and lives in the header.
+  // Normal par défaut, sauf variante passée par la route (héros de l'accueil,
+  // case de la collection). Ne déclenche jamais de nouvelle requête.
   const [variant, setVariant] = useState<SpriteVariant>(variantParam === 'shiny' ? 'shiny' : 'normal');
 
   useEffect(() => {
@@ -169,14 +158,11 @@ export default function PokemonDetailScreen() {
 
   const { details } = state;
   const shinyAvailable = details.sprites.shiny !== null;
-  // A shiny the API has no artwork for falls back to Normal rather than showing
-  // nothing, and the control below reflects that fallback.
+  // Sans artwork shiny, on retombe sur Normal et le contrôle reflète ce repli.
   const effectiveVariant: SpriteVariant = variant === 'shiny' && !shinyAvailable ? 'normal' : variant;
   const spriteUrl = resolveSprite(details.sprites, effectiveVariant);
   const name = displayName(details);
   const favorite = isFavorite(details.id);
-  // Everything below is read from the already-loaded detail in the active
-  // language, so a language switch re-renders without a request.
   const description = pickLocalized(details.descriptions, language) ?? t('detail.noDescription');
   const abilityLines = details.abilities.map((ability) =>
     ability.isHidden
@@ -184,8 +170,8 @@ export default function PokemonDetailScreen() {
       : ability.names[language],
   );
   const variantLabel = t(`detail.variant.${effectiveVariant}`);
-  // Type-colored headings are 16px bold — body-size text — so they take a
-  // shade of the accent that reaches 4.5:1 on the card, in either theme.
+  // Titres de 16px gras, donc texte courant : nuance de l'accent à 4,5:1 sur la
+  // carte, dans les deux thèmes.
   const accentText = accentOn(accent, palette.surface);
   const onAccent = foregroundOn(accent);
 
@@ -197,16 +183,12 @@ export default function PokemonDetailScreen() {
         onBack={() => goBack('/pokedex')}
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* The Pokémon's own color carries the hero: a rounded accent field whose
-            lower edge is where the white card starts, so the artwork straddles
-            the two the way it does in Figma. The app's red stays in the chrome. */}
         <View style={styles.hero}>
           <View style={[styles.heroBackdrop, { backgroundColor: accent }]} pointerEvents="none">
             <View style={styles.watermark}>
               <MaterialCommunityIcons name="pokeball" size={WATERMARK_SIZE} color={OVERLAY.watermark} {...DECORATIVE} />
             </View>
           </View>
-          {/* Artwork overlaps the card below; zIndex keeps it painted on top of it. */}
           <View style={styles.heroRow}>
             <HeroChevron direction="previous" currentId={details.id} color={onAccent} />
             {spriteUrl ? (
@@ -214,9 +196,8 @@ export default function PokemonDetailScreen() {
                 source={spriteUrl}
                 style={styles.artwork}
                 contentFit="contain"
-                // The one informative image: it names the variant being shown.
-                // On web the label becomes the <img> alt; a role there would land
-                // on expo-image's wrapper as a second, unnamed image.
+                // Sur le web, le label devient l'alt du <img> ; un role y tomberait sur
+                // le wrapper d'expo-image, vu comme une seconde image sans nom.
                 accessible
                 role={Platform.OS === 'web' ? undefined : 'img'}
                 accessibilityLabel={t('detail.artwork', { name, variant: variantLabel })}
@@ -231,9 +212,6 @@ export default function PokemonDetailScreen() {
         </View>
 
         <PokedexSurface variant="panel" style={styles.card}>
-          {/* Three groups, so a tall viewport shares its spare height between
-              them instead of dumping it all below Base Stats. On a short screen
-              they simply stack as before. */}
           <View style={styles.group}>
             <View style={styles.types}>
               {details.types.map((type) => (
@@ -241,7 +219,6 @@ export default function PokemonDetailScreen() {
               ))}
             </View>
 
-            {/* Secondary actions: compact, and purely local to already-loaded data. */}
             <View style={styles.actions}>
               <Segmented
                 accent={accent}
@@ -260,7 +237,7 @@ export default function PokemonDetailScreen() {
                 active={favorite}
                 disabled={!hydrated}
                 onPress={() => toggleFavorite(details.id, effectiveVariant)}
-                // The label itself says add or remove, so no extra selected state.
+                // Le label dit déjà ajouter ou retirer : pas d'état sélectionné en plus.
                 accessibilityLabel={t(favorite ? 'detail.favoriteRemove' : 'detail.favoriteAdd', { name })}
               />
             </View>
@@ -312,11 +289,7 @@ export default function PokemonDetailScreen() {
   );
 }
 
-/**
- * Previous/next chevron around the hero. Rendered as an invisible spacer at the
- * Dex boundaries so the artwork stays centered. `color` is the foreground that
- * reads on the hero's accent: white on dark types, dark on light ones.
- */
+// Aux bornes du Dex, un espaceur invisible garde l'artwork centré.
 function HeroChevron({
   direction,
   currentId,
@@ -333,7 +306,7 @@ function HeroChevron({
   return (
     <Pressable
       onPress={() => goToDexId(targetId)}
-      // 32px plus 8px on every side: a 48px target on native.
+      // 32px + 8px de chaque côté : cible de 48px en natif.
       hitSlop={8}
       role="button"
       accessibilityLabel={t(direction === 'previous' ? 'detail.previous' : 'detail.next', {
@@ -383,7 +356,7 @@ function Segmented<T extends string>({
               selected && { backgroundColor: accent },
               option.disabled && styles.disabled,
             ]}>
-            {/* Selected also reads bolder, not only filled with the accent. */}
+            {/* La sélection se lit aussi en gras, pas seulement par la couleur. */}
             <Text style={[styles.segmentText, selected && styles.segmentTextSelected, selected && { color: foregroundOn(accent) }]}>
               {option.label}
             </Text>
@@ -423,7 +396,7 @@ function AboutColumn({
 }
 
 const useStyles = createThemedStyles((c) => ({
-  // `flexGrow` (not `flex`) so the card fills a short viewport but still grows with content.
+  // `flexGrow` et non `flex` : remplit un écran court mais grandit avec le contenu.
   content: {
     flexGrow: 1,
     paddingHorizontal: SHELL.inset,
@@ -451,7 +424,6 @@ const useStyles = createThemedStyles((c) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.xs,
-    // The artwork overhangs the accent field by this much and lands on the card.
     marginBottom: -ARTWORK_OVERLAP,
   },
   chevron: {
@@ -470,14 +442,12 @@ const useStyles = createThemedStyles((c) => ({
   },
   card: {
     flexGrow: 1,
-    // Room for the artwork that overhangs the top of the card.
     paddingTop: ARTWORK_OVERLAP + SPACING.sm,
     paddingHorizontal: SPACING.xl,
     paddingBottom: SPACING.xl,
     gap: SPACING.lg,
-    // Spare height on a tall phone is shared between the three groups rather
-    // than left as one dead block under Base Stats. A no-op once the content
-    // is taller than the viewport, so 360x640 layouts are untouched.
+    // Répartit la hauteur libre d'un grand écran entre les trois groupes ; sans
+    // effet dès que le contenu dépasse l'écran.
     justifyContent: 'space-between',
   },
   group: {
@@ -503,11 +473,10 @@ const useStyles = createThemedStyles((c) => ({
     backgroundColor: c.surfaceMuted,
   },
   segment: {
-    // min-: grows with a larger text size instead of clipping the label.
+    // minHeight : grandit avec la taille de texte au lieu de rogner le libellé.
     minHeight: 24,
     justifyContent: 'center',
     paddingHorizontal: 10,
-    // 24px tall, so the pill radius is what the segment already rendered as.
     borderRadius: RADIUS.pill,
   },
   segmentText: {
@@ -566,9 +535,6 @@ const useStyles = createThemedStyles((c) => ({
   },
   stats: {
     gap: SPACING.md,
-    // On a tall screen the table itself absorbs the spare height — up to
-    // STATS_MAX_HEIGHT — so the card never opens large gaps between its
-    // sections, and the short layout (which has no spare height) is untouched.
     flexGrow: 1,
     justifyContent: 'space-between',
     maxHeight: STATS_MAX_HEIGHT,

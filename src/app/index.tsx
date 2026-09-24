@@ -45,25 +45,16 @@ import type {
 import { DECORATIVE } from "@/utils/a11y";
 import { formatDexNumber } from "@/utils/pokemonList";
 
-/**
- * Outcome of the hero fetch, tagged with the id it was requested for. An error
- * keeps the technical message only; the fallback wording is translated at
- * render time so it follows a language switch.
- */
+// L'erreur ne garde que le message technique : le libellé de repli est traduit
+// au rendu pour suivre un changement de langue.
 type HeroResult =
   | { id: NationalDexId; status: "success"; pokemon: PokemonSummary }
   | { id: NationalDexId; status: "error"; message: string | null };
 
-/** Random hero used while the collection is empty. */
 const EMPTY_COLLECTION_HERO_ID = (Math.floor(
   Math.random() * NATIONAL_DEX_TOTAL,
 ) + 1) as NationalDexId;
 
-/**
- * The stage the hero Pokémon stands on: a square area, with the Pokéball
- * watermark centered behind the artwork at `STAGE_SIZE` minus the stage margin
- * on every side.
- */
 const STAGE_SIZE = 220;
 const STAGE_MARGIN = SPACING.lg;
 const WATERMARK_SIZE = STAGE_SIZE - 2 * STAGE_MARGIN;
@@ -88,9 +79,8 @@ export default function HomeScreen() {
   const favoritesKey = favoriteIds.join(",");
   const [selectedFor, setSelectedFor] = useState<string | null>(null);
 
-  // Hero selection is adjusted during render (the React "derived state" pattern)
-  // and guarded by `selectedFor`, so the random draw runs once per favorite set
-  // instead of on every render.
+  // Sélection ajustée pendant le rendu (état dérivé) et gardée par `selectedFor` :
+  // un seul tirage par ensemble de favoris, pas à chaque rendu.
   if (hydrated && selectedFor !== favoritesKey) {
     setSelectedFor(favoritesKey);
     if (favoriteIds.length === 0) {
@@ -103,7 +93,6 @@ export default function HomeScreen() {
     if (heroId === null) return;
     const requestedId = heroId;
     let cancelled = false;
-    // Exactly one summary request: Home never loads the Dex or every favorite.
     fetchPokemonById(requestedId)
       .then((pokemon) => {
         if (!cancelled)
@@ -123,8 +112,8 @@ export default function HomeScreen() {
     };
   }, [heroId, attempt]);
 
-  // A result belongs to the current hero only while its id still matches, so
-  // selecting another hero shows the loading state without an extra setState.
+  // Un résultat ne vaut que pour le héros de même id : changer de héros repasse
+  // en chargement sans setState supplémentaire.
   const state = useMemo<HeroResult | { status: "loading" }>(
     () =>
       result !== null && result.id === heroId ? result : { status: "loading" },
@@ -148,8 +137,6 @@ export default function HomeScreen() {
   );
 
   const favoriteCount = favoriteIds.length;
-  // The hero is shown as it was saved: a shiny favorite shows its shiny
-  // artwork; anything else stays Normal.
   const heroVariant: SpriteVariant =
     state.status === "success"
       ? (getFavorite(state.pokemon.id)?.variant ?? "normal")
@@ -171,9 +158,6 @@ export default function HomeScreen() {
         subtitle={t("home.subtitle", { count: NATIONAL_DEX_TOTAL })}
       />
 
-      {/* Home is a screen inside the Pokédex, not a separate page: the white
-          sheet is the room the hero Pokémon stands in, and the shortcuts
-          sit under it. */}
       <PokedexSurface>
         <ScrollView
           contentContainerStyle={styles.content}
@@ -211,7 +195,7 @@ export default function HomeScreen() {
                 pressed && styles.pressed,
               ]}>
               <Stage>
-                {/* The button's label already names the Pokémon: the artwork is decorative. */}
+                {/* Le label du bouton nomme déjà le Pokémon : l'artwork est décoratif. */}
                 {heroSprite !== null && (
                   <Image
                     source={heroSprite}
@@ -274,13 +258,6 @@ export default function HomeScreen() {
   );
 }
 
-/**
- * The stage: the brand's Pokéball watermark, painted straight on the sheet in
- * the theme's watermark gray, and whatever stands on it — the hero artwork, a
- * spinner, or nothing for an empty state. The artwork is deliberately larger
- * than the watermark so the Pokémon reads as present in the room rather than
- * contained by a card.
- */
 function Stage({ children }: { children?: ReactNode }) {
   const styles = useStyles();
   const { palette } = useTheme();
@@ -298,11 +275,8 @@ function Stage({ children }: { children?: ReactNode }) {
   );
 }
 
-/**
- * One shortcut tile: accent icon chip, label, and a live count in accent. The
- * count is large text (24px bold), so it takes a shade of the accent that
- * reaches 3:1 on the tile; the chip and the top edge keep the accent itself.
- */
+// Le compteur est du grand texte (24px gras) : une nuance de l'accent à 3:1 sur
+// la tuile suffit.
 function ActionCard({
   accent,
   icon,
@@ -432,7 +406,6 @@ const useStyles = createThemedStyles((c) => ({
     flex: 1,
     backgroundColor: c.surfaceMuted,
     borderRadius: RADIUS.card,
-    // A thick accent edge is what keeps the two tiles telling themselves apart.
     borderTopWidth: 4,
     padding: 14,
     gap: SPACING.xs,

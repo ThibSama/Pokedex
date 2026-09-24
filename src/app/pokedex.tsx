@@ -59,7 +59,6 @@ import {
 
 type LoadStatus = "loading" | "loadingMore" | "idle" | "error";
 
-/** Icon-only sort control: the glyph itself says which order is active. */
 const SORT_ICONS: Record<
   SortMode,
   "sort-numeric-variant" | "sort-alphabetical-variant"
@@ -69,14 +68,10 @@ const SORT_ICONS: Record<
 };
 const SORT_MODES = Object.keys(SORT_ICONS) as SortMode[];
 
-/** Figma list frame 1017:431. */
 const COLUMNS = 3;
 
-/**
- * Native touch targets (react-native-web ignores `hitSlop`). The 32px sort
- * buttons sit 4px apart inside their group, so their slops stay inside those
- * 4px; the 32px Filter pill and the 40px type options reach 44 tall.
- */
+// hitSlop n'agit qu'en natif. Les boutons de tri sont espacés de 4px : leurs
+// zones restent dans cet écart ; le reste atteint 44px de haut.
 const SORT_HIT_SLOP = [
   { top: 6, bottom: 6, left: 6, right: 2 },
   { top: 6, bottom: 6, left: 2, right: 6 },
@@ -84,19 +79,13 @@ const SORT_HIT_SLOP = [
 const FILTER_HIT_SLOP = { top: 6, bottom: 6 };
 const OPTION_HIT_SLOP = 2;
 
-/**
- * The browser paints its own focus ring on a text input; the field draws an
- * app-owned focused state instead. `outlineStyle: 'none'` is valid here and
- * react-native-web passes it through (its own modal focus trap does the same),
- * but the React Native style type only lists the dotted/dashed/solid values, so
- * the value is widened. Web only, so native never sees it.
- */
+// Le champ dessine son propre état focus. react-native-web accepte
+// `outlineStyle: 'none'`, mais le type RN ne le liste pas, d'où le cast.
 const WEB_FOCUS_RING_RESET: TextStyle =
   Platform.OS === "web"
     ? { outlineStyle: "none" as string as TextStyle["outlineStyle"] }
     : {};
 
-/** Content box the grid lays out in, inside the red shell and the white sheet. */
 function gridContentWidth(frameWidth: number): number {
   return frameWidth - 2 * SHELL.inset - 2 * SHELL.listPadding;
 }
@@ -110,7 +99,7 @@ export default function PokedexListScreen() {
   const message = useMessageStyles();
   const { palette } = useTheme();
 
-  // Canonical loaded data, in fetch order. Never sorted/filtered in place.
+  // Données canoniques, dans l'ordre de chargement : jamais triées ni filtrées sur place.
   const [items, setItems] = useState<PokemonSummary[]>([]);
   const [nextOffset, setNextOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -120,12 +109,11 @@ export default function PokedexListScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Guards against concurrent page requests; the hydration chain below relies
-  // on it to keep exactly one page in flight.
+  // Une seule page en vol à la fois ; la chaîne d'hydratation en dépend.
   const inFlight = useRef(false);
   const mounted = useRef(true);
 
-  // Performs the request. Callers set the pending status first (initial state is already 'loading').
+  // L'appelant pose le statut d'attente avant (l'état initial est déjà 'loading').
   const loadPage = useCallback((offset: number) => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -139,9 +127,8 @@ export default function PokedexListScreen() {
       })
       .catch((error: unknown) => {
         if (!mounted.current) return;
-        // Never null on failure: the hydration chain stops on a non-null
-        // error. An empty message is translated at render time instead, so
-        // this callback stays independent of the language.
+        // Jamais null : la chaîne d'hydratation s'arrête sur une erreur non nulle.
+        // Un message vide est traduit au rendu.
         setErrorMessage(error instanceof Error ? error.message : "");
         setStatus("error");
       })
@@ -168,15 +155,8 @@ export default function PokedexListScreen() {
     [loadPage],
   );
 
-  /**
-   * Sequential background hydration: as soon as one page has settled the next
-   * one starts on its own, so the whole Dex fills in without the user pressing
-   * anything and searching for a late entry eventually finds it.
-   *
-   * One page is ever in flight (`inFlight` plus this status gate), the chain
-   * stops on the first error — the footer then offers the retry — and it stops
-   * for good once the component unmounts.
-   */
+  // Hydratation séquentielle : chaque page terminée lance la suivante. Arrêt à la
+  // première erreur (le footer propose de réessayer) et au démontage.
   useEffect(() => {
     if (
       !mounted.current ||
@@ -198,13 +178,10 @@ export default function PokedexListScreen() {
     setFilterOpen(false);
   };
 
-  // Search/sort/filter are derived purely from client state — no network
-  // involved, including when the language changes the name sort.
   const visible = useMemo(
     () => applyListOptions(items, options, language),
     [items, options, language],
   );
-  // The same 18 canonical slugs, ordered by the label the user actually reads.
   const typeOptions = useMemo(() => {
     const collator = new Intl.Collator(LOCALE_TAGS[language]);
     return [...TYPE_NAMES].sort((a, b) =>
@@ -222,7 +199,6 @@ export default function PokedexListScreen() {
 
   return (
     <PokedexScreen>
-      {/* One coherent red header area: back, title, search, sort and the type filter. */}
       <PokedexHeader title={t("pokedex.title")} onBack={() => goBack("/")}>
         <View style={styles.controlsRow}>
           <View
@@ -281,8 +257,6 @@ export default function PokedexListScreen() {
           </View>
         </View>
 
-        {/* One compact Filter control on the header, so the type list never
-            squeezes the grid and the current filter stays readable. */}
         <View style={styles.filterRow}>
           <Pressable
             onPress={() => setFilterOpen(true)}
@@ -374,13 +348,12 @@ export default function PokedexListScreen() {
         )}
       </PokedexSurface>
 
-      {/* The selector rides above the screen, so the header keeps one control. */}
       <Modal
         visible={filterOpen}
         transparent
         animationType="fade"
         onRequestClose={() => setFilterOpen(false)}
-        // react-native-web spreads this onto its role="dialog" element.
+        // react-native-web reporte cette prop sur son élément role="dialog".
         aria-label={t("pokedex.filter.dialogLabel")}>
         <View style={styles.filterBackdrop}>
           <Pressable
@@ -431,12 +404,8 @@ export default function PokedexListScreen() {
   );
 }
 
-/**
- * One selectable type in the filter panel: color indicator plus label. The
- * selected option is filled with its type color — its text white or dark,
- * whichever reads — and also marked by a check and a bolder label, so the
- * choice never rests on color alone.
- */
+// L'option choisie porte aussi une coche et un libellé en gras : le choix ne
+// repose jamais sur la seule couleur.
 function FilterOption({
   label,
   accessibilityLabel,
@@ -444,10 +413,8 @@ function FilterOption({
   selected,
   onPress,
 }: {
-  /** Localized label; the option's value stays the canonical slug in the caller. */
   label: string;
   accessibilityLabel: string;
-  /** Type accent, or null for the catch-all option, which shows no dot. */
   color: string | null;
   selected: boolean;
   onPress: () => void;
@@ -535,9 +502,8 @@ function ListFooter({
       </View>
     );
   }
-  // Background hydration: one progress bar a screen reader can read on demand.
-  // Deliberately not a live region, so the 9 page arrivals are never
-  // announced one by one. Between two pages the spinner is simply absent.
+  // Volontairement pas une live region : les 9 pages ne sont pas annoncées une à
+  // une, le lecteur d'écran lit la barre à la demande.
   return (
     <View
       style={styles.footer}
@@ -569,8 +535,7 @@ const useStyles = createThemedStyles((c) => ({
     gap: SPACING.sm,
     height: 40,
     borderRadius: RADIUS.field,
-    // The focused state is this border; it is reserved (transparent) so nothing
-    // moves when the field takes focus.
+    // Bordure réservée (transparente) : rien ne bouge à la prise de focus.
     borderWidth: 2,
     borderColor: "transparent",
     paddingHorizontal: SPACING.md - 2,
@@ -582,7 +547,7 @@ const useStyles = createThemedStyles((c) => ({
   },
   searchInput: {
     flex: 1,
-    // Body1 without its 14px line-height, which would clip descenders in a native input.
+    // Sans le lineHeight de Body1, qui rognerait les jambages dans un input natif.
     fontFamily: FONT_FAMILY.regular,
     fontSize: 14,
     color: c.text,
@@ -616,7 +581,7 @@ const useStyles = createThemedStyles((c) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    // min-: grows with a larger text size instead of clipping the label.
+    // minHeight : grandit avec la taille de texte au lieu de rogner le libellé.
     minHeight: 32,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.pill,
@@ -640,7 +605,6 @@ const useStyles = createThemedStyles((c) => ({
   },
   filterPanel: {
     width: "100%",
-    // The web frame caps the app at a phone width; the panel follows it.
     maxWidth: APP_FRAME_MAX_WIDTH,
     maxHeight: "75%",
     paddingTop: SPACING.lg,

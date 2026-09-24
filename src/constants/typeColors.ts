@@ -1,4 +1,3 @@
-/** Accent color per standard Pokémon type (Figma Pokédex palette). */
 export const TYPE_COLORS = {
   bug: '#A7B723',
   dark: '#75574C',
@@ -20,10 +19,9 @@ export const TYPE_COLORS = {
   water: '#6493EB',
 } as const satisfies Record<string, string>;
 
-/** Canonical PokéAPI type slug, e.g. `dark`. Logic and filters use these; only labels are translated. */
+/** Slug PokéAPI canonique (`dark`) : la logique s'appuie dessus, seul le libellé est traduit. */
 export type PokemonType = keyof typeof TYPE_COLORS;
 
-/** The 18 standard types by canonical slug — the filter's option list, before localized sorting. */
 export const TYPE_NAMES = (Object.keys(TYPE_COLORS) as PokemonType[]).sort();
 
 export function isPokemonType(type: string | undefined): type is PokemonType {
@@ -34,7 +32,7 @@ export function getTypeColor(type: string | undefined): string {
   return isPokemonType(type) ? TYPE_COLORS[type] : TYPE_COLORS.normal;
 }
 
-/** `#RRGGBB` → `rgba(r, g, b, alpha)` for tinted backgrounds. */
+// Attend une couleur `#RRGGBB`.
 export function withAlpha(hex: string, alpha: number): string {
   const value = parseInt(hex.slice(1), 16);
   const r = (value >> 16) & 255;

@@ -11,37 +11,34 @@ import { loadThemeMode } from '@/theme/themeStorage';
 import type { ThemeMode } from '@/theme/tokens';
 import { POPPINS_FONTS } from '@/theme/typography';
 
-// Keep the splash up while Poppins loads and the stored language and theme are
-// applied, so no screen paints in the system font, the wrong language or the
-// wrong theme first.
+// Le splash reste affiché tant que Poppins, la langue et le thème stockés ne sont
+// pas appliqués, pour éviter un premier rendu dans la mauvaise police/langue/thème.
 SplashScreen.preventAutoHideAsync().catch(() => {
-  // Non-fatal: the splash simply hides on its own schedule.
+  // Sans gravité : le splash se masquera de lui-même.
 });
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(POPPINS_FONTS);
-  // i18n already runs on the device language; this waits for a stored choice
-  // to override it. Effects never run during web static rendering, so the
-  // exported HTML is an empty shell too rather than a page in a fixed language.
+  // i18n démarre sur la langue de l'appareil ; on attend un éventuel choix stocké.
+  // Pas d'effets en rendu statique web : le HTML exporté reste une coquille vide.
   const [languageReady, setLanguageReady] = useState(false);
-  // Null until the stored theme is read; a missing or unreadable one is Light.
   const [themeMode, setThemeMode] = useState<ThemeMode | null>(null);
   const ready = fontsLoaded && languageReady && themeMode !== null;
 
   useEffect(() => {
     hydrateLanguage()
       .catch(() => {
-        // Keep the device language: a storage problem must never hold the splash.
+        // On garde la langue de l'appareil : le stockage ne doit jamais bloquer le splash.
       })
       .finally(() => setLanguageReady(true));
-    // Never rejects: any storage problem already resolves to Light.
+    // Ne rejette jamais : toute erreur de stockage donne déjà Light.
     loadThemeMode().then(setThemeMode);
   }, []);
 
   useEffect(() => {
     if (ready) {
       SplashScreen.hideAsync().catch(() => {
-        // Non-fatal: the splash is already gone.
+        // Sans gravité : le splash a déjà disparu.
       });
     }
   }, [ready]);
@@ -51,11 +48,8 @@ export default function RootLayout() {
   return (
     <ThemeProvider initialMode={themeMode}>
       <FavoritesProvider>
-        {/* One width cap for every route: on a wide browser the whole navigator
-            is centered in a phone-sized column; on native it is a no-op. */}
         <AppShell>
           <Stack screenOptions={{ headerShown: false }}>
-            {/* Every screen paints its own Figma header area, back affordance included. */}
             <Stack.Screen name="index" />
             <Stack.Screen name="pokedex" />
             <Stack.Screen name="collection" />

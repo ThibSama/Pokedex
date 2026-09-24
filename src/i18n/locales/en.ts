@@ -1,6 +1,5 @@
 import type { LocaleResource } from "./fr";
 
-/** English copy. Typed against the French tree, so both always carry the same keys. */
 const en: LocaleResource = {
   common: {
     retry: "Retry",

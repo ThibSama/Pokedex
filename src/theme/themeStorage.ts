@@ -2,20 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { ThemeMode } from '@/theme/tokens';
 
-/**
- * The user's explicit theme choice, stored as the bare mode (`light` / `dark`).
- * Versioned like the language and favorites keys.
- */
 export const THEME_STORAGE_KEY = 'pokedex:theme:v1';
 
 function isThemeMode(value: unknown): value is ThemeMode {
   return value === 'light' || value === 'dark';
 }
 
-/**
- * The stored mode. Anything else — no value, an unknown string, a storage
- * failure — is Light: the app never follows the system theme on its own.
- */
+// Tout le reste vaut Light : l'app ne suit jamais le thème système d'elle-même.
 export async function loadThemeMode(): Promise<ThemeMode> {
   try {
     const raw = await AsyncStorage.getItem(THEME_STORAGE_KEY);

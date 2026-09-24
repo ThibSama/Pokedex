@@ -44,11 +44,9 @@ export default function CollectionScreen() {
     };
   }, []);
 
-  // Summaries already fetched this session; removing a favorite must not
-  // re-request the ones that stay.
+  // Retirer un favori ne doit pas redemander les résumés déjà chargés.
   const cache = useRef(new Map<NationalDexId, PokemonSummary>());
 
-  // Only the persisted favorite ids are requested — never the full Dex.
   const key = favoriteIds.join(',');
 
   useEffect(() => {
@@ -56,7 +54,6 @@ export default function CollectionScreen() {
     const ids: NationalDexId[] = key.length === 0 ? [] : key.split(',').map(Number);
     const missing = ids.filter((id) => !cache.current.has(id));
 
-    // Builds the list in favorite insertion order from whatever is cached.
     const collect = () => ids.map((id) => cache.current.get(id)).filter((item) => item !== undefined);
 
     if (missing.length === 0) {
@@ -89,11 +86,7 @@ export default function CollectionScreen() {
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
-  /**
-   * Box geometry. A single favorite is staged as one wide object instead of a
-   * lonely tile in the top-left corner; from two on, the box fills two by two
-   * and steps down to one column only on unusually narrow frames.
-   */
+  // Un favori seul occupe toute la largeur plutôt qu'une tuile isolée dans un coin.
   const { columns, slotWidth } = useMemo(() => {
     const content = frameWidth - 2 * SHELL.inset - 2 * SHELL.listPadding;
     const count = favoriteEntries.length <= 1 ? 1 : gridColumns(content, 2);
@@ -140,7 +133,6 @@ export default function CollectionScreen() {
           </StateView>
         ) : (
           <FlatList
-            // `items` is already in favorite insertion order, oldest first.
             data={items}
             key={`box-${columns}`}
             numColumns={columns}
@@ -161,29 +153,21 @@ export default function CollectionScreen() {
   );
 }
 
-/**
- * One Pokémon in the box: artwork on a soft slot, its name underneath, and a
- * sparkle badge when the favorite was stored as Shiny. No Dex number, no footer
- * band — the artwork is the object, the slot is only where it stands.
- */
 function CollectionSlot({
   pokemon,
   width,
   variant,
 }: {
   pokemon: PokemonSummary;
-  /** Slot width; the slot is square so the artwork scales with the box. */
   width: number;
-  /** Stored variant of this favorite, which is what the slot must show. */
   variant: SpriteVariant;
 }) {
   const { t } = useTranslation();
   const { name, cardLabel } = usePokemonText();
   const styles = useStyles();
   const { palette } = useTheme();
-  // `Link asChild` hands the child to Radix's Slot, which merges styles with an
-  // object spread: a style *function* or array would silently become `{}`. So
-  // press state is tracked here and flattened into the single object Slot takes.
+  // `Link asChild` passe par le Slot de Radix, qui fusionne les styles par spread :
+  // une fonction ou un tableau de styles deviendrait `{}`. D'où l'état pressed manuel.
   const [pressed, setPressed] = useState(false);
   const style = StyleSheet.flatten<ViewStyle>([styles.slot, { width, height: width }, pressed && styles.pressed]);
 
@@ -195,7 +179,7 @@ function CollectionSlot({
       <Pressable
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
-        // It navigates, so it is a link; its label already says "shiny".
+        // Ça navigue, donc c'est un lien ; le label mentionne déjà « shiny ».
         role="link"
         accessibilityLabel={cardLabel(pokemon, isShiny)}
         accessibilityHint={t('pokemon.openHint')}
@@ -218,8 +202,6 @@ function CollectionSlot({
 
 const useStyles = createThemedStyles((c) => ({
   box: {
-    // A sparse box sits in the middle of the sheet instead of hugging the top
-    // edge; once it is taller than the sheet this grows with the content.
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: SHELL.listPadding,

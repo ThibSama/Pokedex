@@ -1,30 +1,23 @@
 import type { PokemonType } from "@/constants/typeColors";
 
-/**
- * French copy — the reference tree. `en.ts` is typed against this structure,
- * so a key added here and forgotten there fails the typecheck.
- *
- * Plural keys follow i18next's `_one` / `_other` suffixes (Intl.PluralRules):
- * in French, 0 and 1 are both `one`.
- */
+// Arbre de référence : `en.ts` est typé dessus, une clé oubliée casse le typecheck.
+// Pluriels i18next `_one` / `_other` : en français, 0 et 1 relèvent de `one`.
 const fr = {
   common: {
     retry: "Réessayer",
     unknownError: "Erreur inconnue",
-    /** Joins two type labels in spoken labels: "Plante et Poison". */
     listSeparator: " et ",
     readingCollection: "Lecture de la collection…",
   },
   language: {
     label: "Langue de l’application",
-    /** Each language is named in its own language, whatever the UI language. */
+    // Chaque langue est nommée dans sa propre langue, quelle que soit celle de l'UI.
     names: {
       fr: "Français",
       en: "English",
     },
   },
   theme: {
-    /** One on/off setting: the switch reads "Mode sombre", on or off. */
     dark: "Mode sombre",
   },
   shell: {
@@ -114,7 +107,7 @@ const fr = {
       normal: "Normal",
       shiny: "Shiny",
     },
-    /** French puts a space before the colon. */
+    // Espace avant les deux-points en français.
     segmentOption: "{{group}} : {{option}}",
     favoriteAdd: "Ajouter {{name}} à la collection",
     favoriteRemove: "Retirer {{name}} de la collection",
@@ -132,7 +125,6 @@ const fr = {
     kilograms: "{{value}} kg",
     metres: "{{value}} m",
   },
-  /** Short label painted in the stat table, full name for screen readers. */
   stats: {
     hp: { short: "PV", long: "Points de vie" },
     attack: { short: "ATQ", long: "Attaque" },
@@ -140,10 +132,8 @@ const fr = {
     specialAttack: { short: "A.SP", long: "Attaque spéciale" },
     specialDefense: { short: "D.SP", long: "Défense spéciale" },
     speed: { short: "VIT", long: "Vitesse" },
-    /** One spoken element per row: « Attaque, 110 ». */
     value: "{{stat}}, {{value}}",
   },
-  /** Official French type names, keyed by canonical PokéAPI slug. */
   types: {
     bug: "Insecte",
     dark: "Ténèbres",
@@ -166,7 +156,6 @@ const fr = {
   } satisfies Record<PokemonType, string>,
 } as const;
 
-/** The key structure every locale must match, with any string as the value. */
 type ResourceShape<T> = {
   [K in keyof T]: T[K] extends string ? string : ResourceShape<T[K]>;
 };

@@ -3,13 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupportedDexId } from '@/api/pokeApi';
 import type { FavoritePokemon, NationalDexId, SpriteVariant } from '@/types/pokemon';
 
-/**
- * Versioned keys: a schema change bumps the suffix instead of migrating in
- * place, so the previous payload stays readable until it has been rewritten.
- *
- * `v2` stores ordered favorite records (Dex id + chosen artwork variant).
- * `v1` stored bare ids and is only read to migrate an existing collection.
- */
+// Un changement de schéma incrémente le suffixe plutôt que de migrer sur place.
+// v1 (ids seuls) n'est plus lu que pour migrer vers v2 (id + variante).
 export const FAVORITES_STORAGE_KEY = 'pokedex:favorites:v2';
 export const FAVORITES_STORAGE_KEY_V1 = 'pokedex:favorites:v1';
 
@@ -19,10 +14,6 @@ function isVariant(value: unknown): value is SpriteVariant {
   return typeof value === 'string' && (VARIANTS as readonly string[]).includes(value);
 }
 
-/**
- * Keep only usable Dex ids from a v1 payload, in first-seen order: integers
- * inside #001–#251, without duplicates. Anything else is dropped silently.
- */
 export function sanitizeFavoriteIds(value: unknown): NationalDexId[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<NationalDexId>();
@@ -35,12 +26,7 @@ export function sanitizeFavoriteIds(value: unknown): NationalDexId[] {
   return ids;
 }
 
-/**
- * Keep only usable favorites, in first-seen order: a supported Dex id, no
- * duplicates. Variant is presentation metadata, so a missing or unreadable one
- * degrades to `normal` rather than dropping the entry — an unreadable variant
- * must never cost the user a Pokémon.
- */
+// Une variante illisible retombe sur `normal` : elle ne doit jamais faire perdre un Pokémon.
 export function sanitizeFavoriteEntries(value: unknown): FavoritePokemon[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<NationalDexId>();
@@ -55,26 +41,18 @@ export function sanitizeFavoriteEntries(value: unknown): FavoritePokemon[] {
   return entries;
 }
 
-/** v1 `number[]` → v2 records: insertion order preserved, invalid ids dropped. */
 export function migrateFavoriteIds(value: unknown): FavoritePokemon[] {
   return sanitizeFavoriteIds(value).map((id) => ({ id, variant: 'normal' }));
 }
 
 export interface LoadedFavorites {
   entries: FavoritePokemon[];
-  /** True when the collection came from the v1 payload and still has to be written back. */
+  /** Vrai si la collection vient de v1 et doit encore être réécrite. */
   migratedFromV1: boolean;
 }
 
-/**
- * Read the persisted favorites.
- *
- * A present v2 key is authoritative even when it holds an empty array: a
- * collection the user emptied must not be resurrected from v1. Only a missing
- * v2 key falls back to the v1 payload, which the caller then rewrites.
- * Missing, unreadable or corrupt storage degrades to an empty collection rather
- * than throwing.
- */
+// Une clé v2 présente fait foi, même vide : une collection vidée ne doit pas
+// renaître de v1. Un stockage illisible donne une collection vide.
 export async function loadFavorites(): Promise<LoadedFavorites> {
   try {
     const raw = await AsyncStorage.getItem(FAVORITES_STORAGE_KEY);
@@ -95,11 +73,6 @@ export async function loadFavorites(): Promise<LoadedFavorites> {
   }
 }
 
-/**
- * Persist the collection as a plain `FavoritePokemon[]`. Only the Dex id and the
- * chosen artwork variant are stored; PokéAPI stays the source of truth for
- * names, sprites and types.
- */
 export async function saveFavorites(entries: readonly FavoritePokemon[]): Promise<void> {
   await AsyncStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(sanitizeFavoriteEntries(entries)));
 }

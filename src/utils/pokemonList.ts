@@ -3,10 +3,9 @@ import type { LanguageCode, PokemonSummary } from '@/types/pokemon';
 export type SortMode = 'dex' | 'name';
 
 export interface ListOptions {
-  /** Free-text search; matches FR/EN names, apiName and Dex number. */
   query: string;
   sort: SortMode;
-  /** Canonical type slug to keep (e.g. `dark`), or null for all. Never a translated label. */
+  /** Slug canonique (`dark`), jamais un libellé traduit. */
   type: string | null;
 }
 
@@ -16,7 +15,6 @@ export function formatDexNumber(id: number): string {
   return `#${String(id).padStart(3, '0')}`;
 }
 
-/** `inner-focus` → `Inner Focus`, so API slugs never reach the UI verbatim. */
 export function humanizeSlug(slug: string): string {
   return slug
     .split('-')
@@ -25,7 +23,7 @@ export function humanizeSlug(slug: string): string {
     .join(' ');
 }
 
-/** Lowercase and strip diacritics so "evoli" matches "Évoli". */
+// Sans diacritiques : « evoli » trouve « Évoli ».
 function normalizeText(value: string): string {
   return value
     .normalize('NFD')
@@ -34,10 +32,7 @@ function normalizeText(value: string): string {
     .trim();
 }
 
-/**
- * Matches both the French and the English name whatever the UI language, so
- * "Noctali" still finds Umbreon in English. Purely local: nothing is fetched.
- */
+// Cherche dans les noms FR et EN quelle que soit la langue : « Noctali » trouve Umbreon.
 export function matchesQuery(pokemon: PokemonSummary, query: string): boolean {
   const q = normalizeText(query);
   if (q === '') return true;
@@ -52,13 +47,8 @@ export function matchesQuery(pokemon: PokemonSummary, query: string): boolean {
   );
 }
 
-/** Collation locale per display language, for name sorting. */
 const COLLATION_LOCALES: Record<LanguageCode, string> = { fr: 'fr', en: 'en' };
 
-/**
- * Returns a new sorted array; never mutates `items`. Name order follows the
- * displayed name: `names.fr` with French collation, or `names.en` with English.
- */
 export function sortPokemon(
   items: readonly PokemonSummary[],
   mode: SortMode,
@@ -72,7 +62,6 @@ export function sortPokemon(
   return copy.sort((a, b) => a.id - b.id);
 }
 
-/** Filter (query + type) then sort. Pure: input array is untouched. */
 export function applyListOptions(
   items: readonly PokemonSummary[],
   { query, sort, type }: ListOptions,
@@ -84,7 +73,6 @@ export function applyListOptions(
   return sortPokemon(filtered, sort, language);
 }
 
-/** Append `incoming` to `existing`, skipping IDs already present. */
 export function mergeUnique(
   existing: readonly PokemonSummary[],
   incoming: readonly PokemonSummary[],

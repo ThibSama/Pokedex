@@ -13,20 +13,15 @@ import { formatDexNumber } from '@/utils/pokemonList';
 
 interface PokemonCardProps {
   pokemon: PokemonSummary;
-  /** Tile width, computed from the frame so the columns always fit. */
   width?: number;
 }
 
-/** The single grid tile used by both the Pokédex and the Collection. */
 export function PokemonCard({ pokemon, width }: PokemonCardProps) {
   const { t } = useTranslation();
   const { name, cardLabel } = usePokemonText();
   const styles = useStyles();
-  // `Link asChild` hands the child to Radix's Slot, which merges styles with
-  // `{ ...slotStyle, ...childStyle }`. Spreading a style *function* — or an
-  // array — into an object silently yields `{}`, dropping every style including
-  // the computed tile width. So press state is tracked here and the result is
-  // flattened into the single plain object Slot can actually merge.
+  // `Link asChild` passe par le Slot de Radix, qui fusionne les styles par spread :
+  // une fonction ou un tableau de styles deviendrait `{}`. D'où l'état pressed manuel.
   const [pressed, setPressed] = useState(false);
   const style = StyleSheet.flatten<ViewStyle>([
     styles.tile,
@@ -39,13 +34,13 @@ export function PokemonCard({ pokemon, width }: PokemonCardProps) {
       <Pressable
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
-        // It navigates, so it is a link: Enter follows it on web, as for any link.
+        // Ça navigue, donc c'est un lien : Entrée le suit sur le web.
         role="link"
         accessibilityLabel={cardLabel(pokemon)}
         accessibilityHint={t('pokemon.openHint')}
         style={style}>
         <Text style={styles.tileDexNumber}>{formatDexNumber(pokemon.id)}</Text>
-        {/* The tile's label already names the Pokémon: the artwork is decorative. */}
+        {/* Le label de la tuile nomme déjà le Pokémon : l'artwork est décoratif. */}
         <Image source={pokemon.sprites.normal} style={styles.tileArtwork} contentFit="contain" accessibilityLabel="" />
         <View style={styles.tileFooter}>
           <Text style={styles.tileName} numberOfLines={1}>
@@ -58,21 +53,15 @@ export function PokemonCard({ pokemon, width }: PokemonCardProps) {
 }
 
 const TILE_PADDING_TOP = 2;
-/** Figma artwork box inside a tile. */
 const TILE_ARTWORK_SIZE = 72;
 
 const useStyles = createThemedStyles((c) => ({
-  /**
-   * Figma tile: 104x108 at a 360px frame. The height is composed rather than
-   * fixed — 2 (padding) + 12 (Dex number) + 72 (artwork) + 22 (name band).
-   */
   tile: {
     backgroundColor: c.card,
     borderRadius: RADIUS.sheet,
     paddingTop: TILE_PADDING_TOP,
     alignItems: 'center',
     overflow: 'hidden',
-    // Figma card elevation; `elevation` is Android-only and ignored elsewhere.
     ...SHADOW.tile,
   },
   pressed: {

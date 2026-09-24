@@ -4,14 +4,8 @@ import { Poppins_600SemiBold } from '@expo-google-fonts/poppins/600SemiBold';
 import { Poppins_700Bold } from '@expo-google-fonts/poppins/700Bold';
 import type { TextStyle } from 'react-native';
 
-/**
- * Poppins is the Figma type family. Only the four weights the design actually
- * uses are imported, through per-weight subpaths, so Metro does not bundle the
- * other fourteen faces shipped by `@expo-google-fonts/poppins`.
- *
- * React Native cannot synthesize weights for a custom family: a style must name
- * the face it wants, never `fontWeight`. Hence one family constant per weight.
- */
+// Import par sous-chemin pour que Metro n'embarque pas les autres graisses.
+// RN ne synthétise pas les graisses d'une police custom : on nomme la fonte, jamais `fontWeight`.
 export const FONT_FAMILY = {
   regular: 'Poppins_400Regular',
   medium: 'Poppins_500Medium',
@@ -19,7 +13,6 @@ export const FONT_FAMILY = {
   bold: 'Poppins_700Bold',
 } as const;
 
-/** Passed to `useFonts` once, in the root layout. */
 export const POPPINS_FONTS = {
   [FONT_FAMILY.regular]: Poppins_400Regular,
   [FONT_FAMILY.medium]: Poppins_500Medium,
@@ -27,7 +20,6 @@ export const POPPINS_FONTS = {
   [FONT_FAMILY.bold]: Poppins_700Bold,
 };
 
-/** The Figma text styles, verbatim (size / line-height / weight). */
 export const TYPO = {
   headline: { fontFamily: FONT_FAMILY.bold, fontSize: 24, lineHeight: 32 },
   subtitle1: { fontFamily: FONT_FAMILY.bold, fontSize: 14, lineHeight: 16 },

@@ -12,42 +12,24 @@ import { BRAND, OPACITY, OVERLAY, RADIUS, SHELL, SPACING } from '@/theme/tokens'
 import { TYPO } from '@/theme/typography';
 import { choiceProps, DECORATIVE, toggleProps } from '@/utils/a11y';
 
-/**
- * The Pokédex shell: the red chrome, the header band and the white content sheet
- * every route is framed in. Home, Pokédex, Collection and Pokémon detail used to
- * rebuild these three pieces independently, which is why they drifted apart.
- */
-
-/** Back button box. Wider than the chevron glyph, so the glyph still lands on the shell margin. */
 const BACK_BUTTON_SIZE = 28;
-/** 28px plus 8px on every side: a 44px target on native. */
+// 28px + 8px de chaque côté : cible de 44px en natif.
 const BACK_HIT_SLOP = 8;
 
-/**
- * Native touch targets for the 28x24 FR/EN options and the theme switch that
- * shares their track: 44 tall, and as wide as the 2px gaps between them allow
- * without two slops overlapping.
- */
+// hitSlop natif : 44px de haut, et aussi large que les écarts de 2px le permettent
+// sans chevauchement.
 const LANGUAGE_HIT_SLOP = [
   { top: 10, bottom: 10, left: 8, right: 1 },
   { top: 10, bottom: 10, left: 1, right: 1 },
 ];
 const THEME_HIT_SLOP = { top: 10, bottom: 10, left: 1, right: 8 };
 
-/**
- * Returns to the previous screen, or to `fallback` when this screen was opened
- * directly (deep link, cold start, browser refresh) and there is nothing to
- * return to.
- */
+/** Va vers `fallback` si l'écran a été ouvert directement (deep link, rafraîchissement). */
 export function goBack(fallback: '/' | '/pokedex' = '/') {
   if (router.canGoBack()) router.back();
   else router.replace(fallback);
 }
 
-/**
- * The red chrome. Mounted as the outermost view of a route, it also marks the
- * route as headerless: every screen paints this chrome instead of a native one.
- */
 export function PokedexScreen({ children }: { children: ReactNode }) {
   const styles = useStyles();
   return (
@@ -59,23 +41,13 @@ export function PokedexScreen({ children }: { children: ReactNode }) {
 }
 
 interface PokedexHeaderProps {
-  /** Bold Poppins screen title. */
   title: string;
-  /** Small line under the title — the Home wordmark is the only screen with one. */
   subtitle?: string;
-  /** Right-aligned accessory: the favorite count, the Dex number. */
   trailing?: string;
-  /** Omitted on Home, which is the navigator's root and has nothing to return to. */
   onBack?: () => void;
-  /** Extra control rows (search, sort, type filters) painted on the same red band. */
   children?: ReactNode;
 }
 
-/**
- * The application header: back affordance, Pokéball brand mark, bold Poppins
- * title, an optional right-aligned accessory, the app-wide language and theme
- * switches, and whatever control rows the screen adds as children.
- */
 export function PokedexHeader({ title, subtitle, trailing, onBack, children }: PokedexHeaderProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -103,7 +75,6 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
           {subtitle !== undefined && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
         {trailing !== undefined && <Text style={styles.trailing}>{trailing}</Text>}
-        {/* One compact track for both app-wide settings, so the title keeps its room. */}
         <View style={styles.settings}>
           <LanguageSwitch />
           <ThemeSwitch />
@@ -114,11 +85,6 @@ export function PokedexHeader({ title, subtitle, trailing, onBack, children }: P
   );
 }
 
-/**
- * The one language control, reachable from every screen because every screen
- * mounts this header. It switches the whole app in place — no navigation, no
- * refetch — and the choice is persisted for the next launch.
- */
 function LanguageSwitch() {
   const { t } = useTranslation();
   const language = useAppLanguage();
@@ -151,11 +117,6 @@ function LanguageSwitch() {
   );
 }
 
-/**
- * The Light/Dark switch, on the language track right after EN: a sun on the red
- * in Light, a red moon on a white chip in Dark. Like the language, it applies in
- * place — no navigation, no refetch — and is persisted for the next launch.
- */
 function ThemeSwitch() {
   const { t } = useTranslation();
   const { mode, setMode } = useTheme();
@@ -185,21 +146,15 @@ function ThemeSwitch() {
 
 interface PokedexSurfaceProps {
   /**
-   * `sheet` is the route's content sheet: it fills the chrome below the header,
-   * keeping the red visible around the white as a border.
-   * `panel` is the same surface already placed inside a scroller that carries
-   * the chrome inset itself (the detail screen's card), so it keeps the look
-   * without the route geometry.
+   * `sheet` remplit le chrome sous l'en-tête ; `panel` garde le même rendu dans un
+   * scroller qui porte déjà la marge (carte du détail).
    */
   variant?: 'sheet' | 'panel';
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
 }
 
-/**
- * The rounded content surface — white in Light, near-black in Dark: everything
- * readable sits on one of these, so it also carries the theme crossfade.
- */
+// Tout le contenu lisible repose sur cette surface, d'où le fondu de thème ici.
 export function PokedexSurface({ variant = 'sheet', style, children }: PokedexSurfaceProps) {
   const styles = useStyles();
   return (
@@ -223,13 +178,11 @@ const useStyles = createThemedStyles((c) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    // The back box is mostly empty space around the chevron, so the row is
-    // pulled left by the same amount the title is padded by: the chevron glyph
-    // and the title both land on the header margin.
+    // Décalée à gauche du vide autour du chevron : le glyphe et le titre tombent
+    // tous deux sur la marge de l'en-tête.
     paddingLeft: SHELL.headerPadding - SPACING.sm,
     paddingRight: SHELL.headerPadding,
   },
-  /** Home has no back affordance, so its row starts on the header margin itself. */
   titleRowFlush: {
     paddingLeft: SHELL.headerPadding,
   },
@@ -270,8 +223,8 @@ const useStyles = createThemedStyles((c) => ({
     gap: 2,
   },
   languageOption: {
-    // 24 is the WCAG 2.2 minimum target on web, where hitSlop does not apply;
-    // min- so the pill grows with a larger text size instead of clipping it.
+    // 24px : cible minimale WCAG 2.2 sur le web, où hitSlop ne s'applique pas.
+    // minHeight pour grandir avec la taille de texte au lieu de la rogner.
     minHeight: 24,
     minWidth: 28,
     alignItems: 'center',

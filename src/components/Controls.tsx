@@ -7,22 +7,13 @@ import { createThemedStyles, useTheme } from '@/theme/ThemeProvider';
 import { OPACITY, RADIUS, SPACING } from '@/theme/tokens';
 import { TYPO } from '@/theme/typography';
 
-/**
- * Controls shared by every screen. Each one replaces a set of near-identical
- * per-route copies: the red pill existed on three screens, the round icon
- * button on two, and the centered state block on three.
- */
-
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 const ICON_BUTTON_SIZE = 28;
 const ICON_SIZE = 16;
 
-/**
- * Touch-target extensions (native only; react-native-web ignores `hitSlop`).
- * The 40px pill reaches 44. The 28px icon button reaches 44 tall but only 36
- * wide, because its row neighbours are 8px apart and slops must not overlap.
- */
+// hitSlop natif uniquement. Le bouton icône n'atteint que 36px de large : ses
+// voisins sont à 8px et les zones ne doivent pas se chevaucher.
 const PRIMARY_HIT_SLOP = 2;
 const ICON_HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
@@ -34,7 +25,6 @@ interface PrimaryButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** The app's primary action: a red pill, used for retry and for call-to-actions. */
 export function PrimaryButton({
   label,
   onPress,
@@ -58,22 +48,15 @@ export function PrimaryButton({
 
 interface IconButtonProps {
   icon: IconName;
-  /** The Pokémon's type accent; also the icon color when the button is idle. */
   accent: string;
-  /** Filled with `accent` while the button's action is on (playing, favorited). */
   active?: boolean;
   disabled?: boolean;
   onPress?: () => void;
   accessibilityLabel: string;
-  /** Exposed as `aria-busy`, e.g. while a cry is playing. */
   busy?: boolean;
 }
 
-/**
- * A compact secondary action: round, 28px, accent-filled while active. The
- * glyph is a readable shade of the accent when idle (3:1 on its muted disc, in
- * either theme) and white or dark on the accent fill when active.
- */
+// Au repos, le glyphe prend une nuance de l'accent à 3:1 sur son disque, dans les deux thèmes.
 export function IconButton({
   icon,
   accent,
@@ -105,10 +88,8 @@ export function IconButton({
 }
 
 /**
- * Centered block for a screen's loading, empty, invalid and error states.
- * `alert` is announced once when a failure appears, `status` politely (an empty
- * result). Loading states pass neither: their spinner is the progress
- * indicator, and nothing is re-announced while data keeps arriving.
+ * `alert` : annoncé une fois quand une erreur apparaît ; `status` : annonce polie.
+ * Les états de chargement n'en passent aucun, pour ne rien réannoncer.
  */
 export function StateView({ children, announce }: { children: ReactNode; announce?: 'alert' | 'status' }) {
   const styles = useStyles();

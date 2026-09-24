@@ -18,7 +18,6 @@ export const NATIONAL_DEX_MAX: NationalDexId = 251;
 export const NATIONAL_DEX_TOTAL = NATIONAL_DEX_MAX - NATIONAL_DEX_MIN + 1;
 export const DEFAULT_BATCH_SIZE = 30;
 
-/** Subset of the PokéAPI v2 `/pokemon/{id}` response that we actually read. */
 interface RawPokemon {
   id: number;
   name: string;
@@ -33,9 +32,9 @@ interface RawPokemon {
     };
   };
   types: { slot: number; type: { name: string } }[];
-  /** Decimetres. */
+  /** Décimètres. */
   height: number;
-  /** Hectograms. */
+  /** Hectogrammes. */
   weight: number;
   abilities: { slot: number; is_hidden: boolean; ability: { name: string } }[];
   stats: { base_stat: number; stat: { name: string } }[];
@@ -43,18 +42,15 @@ interface RawPokemon {
 
 type RawLocalizedName = { name: string; language: { name: string } };
 
-/** Subset of the PokéAPI v2 `/pokemon-species/{id}` response that we actually read. */
 interface RawSpecies {
   names: RawLocalizedName[];
   flavor_text_entries: { flavor_text: string; language: { name: string } }[];
 }
 
-/** Subset of the PokéAPI v2 `/ability/{name}` response that we actually read. */
 interface RawAbility {
   names: RawLocalizedName[];
 }
 
-/** Explicit PokéAPI stat name → domain key mapping. */
 const STAT_KEYS: Record<string, keyof PokemonStats> = {
   hp: 'hp',
   attack: 'attack',
@@ -78,11 +74,7 @@ export function isSupportedDexId(id: number): id is NationalDexId {
   return Number.isInteger(id) && id >= NATIONAL_DEX_MIN && id <= NATIONAL_DEX_MAX;
 }
 
-/**
- * The artwork a surface should render for `variant`. PokéAPI has no shiny
- * artwork for a handful of entries, and a stored shiny favorite must still show
- * its Pokémon then — as the normal artwork, never as nothing.
- */
+/** PokéAPI n'a pas d'artwork shiny pour quelques entrées : on affiche alors l'artwork normal plutôt que rien. */
 export function resolveSprite(sprites: PokemonSprites, variant: SpriteVariant): string | null {
   return variant === 'shiny' ? (sprites.shiny ?? sprites.normal) : sprites.normal;
 }
@@ -93,7 +85,7 @@ function pickLocalizedName(names: readonly RawLocalizedName[], language: Languag
 
 function normalizePokemon(raw: RawPokemon, species: RawSpecies): PokemonSummary {
   const artwork = raw.sprites.other?.['official-artwork'];
-  // Fall back en → apiName so a missing translation never breaks the UI.
+  // Repli en → apiName : une traduction manquante ne doit jamais casser l'UI.
   const en = pickLocalizedName(species.names, 'en') ?? raw.name;
   const fr = pickLocalizedName(species.names, 'fr') ?? en;
   return {
@@ -117,7 +109,7 @@ function normalizeStats(raw: RawPokemon['stats']): PokemonStats {
   return stats;
 }
 
-/** Collapse PokéAPI line breaks / form feeds / soft hyphens into single spaces. */
+// PokéAPI truffe ses textes de retours à la ligne, sauts de page et traits d'union conditionnels (\u00ad).
 function normalizeFlavorText(text: string): string {
   return text
     .replace(/\u00ad/g, '')
@@ -126,13 +118,9 @@ function normalizeFlavorText(text: string): string {
     .trim();
 }
 
-/**
- * The latest usable flavor text in each language, picked independently: an
- * entry that normalizes to nothing is skipped rather than shown blank.
- */
 function pickDescriptions(species: RawSpecies): PokemonDetails['descriptions'] {
   const pick = (language: LanguageCode): string | null => {
-    // Entries are ordered by game version; the last one is the most recent wording.
+    // Entrées triées par version de jeu : la dernière est la formulation la plus récente.
     const texts = species.flavor_text_entries
       .filter((entry) => entry.language.name === language)
       .map((entry) => normalizeFlavorText(entry.flavor_text))
@@ -142,10 +130,6 @@ function pickDescriptions(species: RawSpecies): PokemonDetails['descriptions'] {
   return { fr: pick('fr'), en: pick('en') };
 }
 
-/**
- * Localized ability names, each falling back to the other language and then to
- * the humanized slug, so a gap in PokéAPI never shows a raw `inner-focus`.
- */
 function normalizeAbilityNames(apiName: string, raw: RawAbility | null): LocalizedNames {
   const fr = raw === null ? undefined : pickLocalizedName(raw.names, 'fr');
   const en = raw === null ? undefined : pickLocalizedName(raw.names, 'en');
@@ -194,29 +178,19 @@ function assertSupportedDexId(id: number): asserts id is NationalDexId {
   }
 }
 
-/** One combined load of `/pokemon/{id}` + `/pokemon-species/{id}` (same id for #001–#251). */
+// Pour #001–#251, l'id d'espèce est identique à l'id du Pokémon.
 async function fetchRawPair(id: NationalDexId): Promise<[RawPokemon, RawSpecies]> {
   return Promise.all([getJson<RawPokemon>('pokemon', id), getJson<RawSpecies>('pokemon-species', id)]);
 }
 
-/**
- * Fetch and normalize one Pokémon summary (detail + species for localized names).
- * Rejects IDs outside 1–251 without a network call.
- */
 export async function fetchPokemonById(id: number): Promise<PokemonSummary> {
   assertSupportedDexId(id);
   const [raw, species] = await fetchRawPair(id);
   return normalizePokemon(raw, species);
 }
 
-/**
- * Per-session cache of localized ability names, keyed by canonical ability name.
- * Many Pokémon share an ability (Chlorophyll, Intimidate…), so visiting the
- * next one does not request `/ability/chlorophyll` again. The promise itself is
- * cached, which also folds concurrent requests for the same ability into one.
- * A failed request is evicted so a later visit can retry it. Memory only:
- * nothing from PokéAPI is persisted.
- */
+// Cache mémoire de session. On garde la promesse pour fusionner les requêtes
+// concurrentes ; un échec est retiré pour qu'une visite suivante réessaie.
 const abilityNamesCache = new Map<string, Promise<LocalizedNames>>();
 
 function fetchAbilityNames(apiName: string): Promise<LocalizedNames> {
@@ -233,11 +207,7 @@ function fetchAbilityNames(apiName: string): Promise<LocalizedNames> {
   return request;
 }
 
-/**
- * Localized names for every ability of `raw`. An ability whose resource cannot
- * be loaded degrades to its humanized slug rather than failing the whole detail
- * screen — the name is secondary information.
- */
+// Un talent introuvable retombe sur son slug plutôt que de faire échouer tout l'écran.
 async function loadAbilityNames(raw: RawPokemon): Promise<Map<string, LocalizedNames>> {
   const names = sortedAbilities(raw).map((entry) => entry.ability.name);
   const resolved = await Promise.all(
@@ -248,13 +218,8 @@ async function loadAbilityNames(raw: RawPokemon): Promise<Map<string, LocalizedN
   return new Map(names.map((apiName, index) => [apiName, resolved[index]]));
 }
 
-/**
- * Fetch the full detail model (summary + height/weight/abilities/stats and both
- * localized descriptions). Ability names in both languages are loaded here, up
- * front, so switching language afterwards needs no request at all. The ability
- * requests start as soon as `/pokemon/{id}` answers, alongside the species one.
- * Rejects IDs outside 1–251 without a network call.
- */
+// Noms de talents chargés d'emblée dans les deux langues : changer de langue
+// ensuite ne relance aucune requête.
 export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   assertSupportedDexId(id);
   const rawRequest = getJson<RawPokemon>('pokemon', id);
@@ -267,17 +232,11 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
 }
 
 export interface FetchPokemonBatchOptions {
-  /** Zero-based offset into the supported Dex range (0 → #001). */
+  /** Décalage à partir de 0 dans la plage du Dex (0 → #001). */
   offset?: number;
-  /** Batch size; defaults to 30. */
   limit?: number;
 }
 
-/**
- * Load one batch of Pokémon in National Dex order. IDs are derived from
- * `offset`/`limit` and clamped to the supported range, so only the requested
- * page is fetched — never the full list.
- */
 export async function fetchPokemonBatch({
   offset = 0,
   limit = DEFAULT_BATCH_SIZE,
